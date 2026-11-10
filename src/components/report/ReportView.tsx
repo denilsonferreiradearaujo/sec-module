@@ -5,6 +5,7 @@ import {
   UnifiedAuditReport,
   SeverityLevel,
   SecurityFinding,
+  WhiteLabelConfig,
 } from '@/core/types/security';
 import {
   Shield,
@@ -28,7 +29,11 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  Building2,
+  Cpu,
+  Sparkles,
 } from 'lucide-react';
+import WhiteLabelModal from './WhiteLabelModal';
 
 interface ReportViewProps {
   report: UnifiedAuditReport;
@@ -36,12 +41,14 @@ interface ReportViewProps {
 }
 
 export default function ReportView({ report, onNewScan }: ReportViewProps) {
-  const [activeTab, setActiveTab] = useState<'findings' | 'checklist' | 'posture' | 'infra' | 'threat' | 'osint' | 'mobile' | 'cve' | 'secrets'>(
+  const [activeTab, setActiveTab] = useState<'findings' | 'checklist' | 'posture' | 'infra' | 'threat' | 'osint' | 'mobile' | 'cve' | 'secrets' | 'kali'>(
     report.secretsAudit ? 'secrets' : 'findings'
   );
   const [selectedSeverity, setSelectedSeverity] = useState<SeverityLevel | 'ALL'>('ALL');
   const [checklistFilter, setChecklistFilter] = useState<'ALL' | 'PASSED' | 'FAILED' | 'WARNING'>('ALL');
   const [expandedFindings, setExpandedFindings] = useState<Record<string, boolean>>({});
+  const [whiteLabelModalOpen, setWhiteLabelModalOpen] = useState(false);
+  const [whiteLabel, setWhiteLabel] = useState<WhiteLabelConfig | undefined>(report.whiteLabel);
 
   const toggleFinding = (id: string) => {
     setExpandedFindings((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -95,21 +102,42 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-8 animate-fadeIn">
+      {/* WhiteLabel Customizer Modal */}
+      {whiteLabelModalOpen && (
+        <WhiteLabelModal
+          currentConfig={whiteLabel}
+          onSave={(cfg) => setWhiteLabel(cfg)}
+          onClose={() => setWhiteLabelModalOpen(false)}
+        />
+      )}
+
       {/* ========================================================
           PRINT-ONLY OFFICIAL EXECUTIVE COVER & HEADER
          ======================================================== */}
       <div className="hidden print:block mb-6 pb-6 border-b-2 border-slate-900">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-3xl tracking-tight text-slate-950 font-mono">DEV & SEC</span>
-              <span className="text-xs px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
-                RELATÓRIO TÉCNICO OFICIAL
-              </span>
+          <div className="flex items-center gap-4">
+            {whiteLabel?.clientLogoUrl && (
+              <div className="h-14 max-w-[140px] flex items-center justify-center p-1 border border-slate-300 rounded bg-white">
+                <img src={whiteLabel.clientLogoUrl} alt="Logo Cliente" className="max-h-full max-w-full object-contain" />
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-3xl tracking-tight text-slate-950 font-mono">DEV & SEC</span>
+                <span className="text-xs px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
+                  RELATÓRIO TÉCNICO OFICIAL
+                </span>
+              </div>
+              <p className="text-sm text-slate-600 font-medium mt-0.5">
+                Laudo Executivo de Postura Cibernética, EASM e Inteligência de Ameaças
+              </p>
+              {whiteLabel?.clientName && (
+                <p className="text-xs font-bold text-slate-900 mt-1 font-mono">
+                  AUDITORIA PREPARADA PARA: <span className="text-emerald-700 uppercase">{whiteLabel.clientName}</span>
+                </p>
+              )}
             </div>
-            <p className="text-sm text-slate-600 font-medium mt-1">
-              Laudo Executivo de Postura Cibernética, EASM e Inteligência de Ameaças
-            </p>
           </div>
           <div className="text-right text-xs font-mono text-slate-700 space-y-1">
             <p><span className="text-slate-500">ALVO AUDITADO:</span> <strong>{report.target}</strong></p>
@@ -129,19 +157,32 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
           <span className="text-xs text-slate-500 font-mono">
             {new Date(report.timestamp).toLocaleString('pt-BR')}
           </span>
+          {whiteLabel?.clientName && (
+            <span className="text-xs text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/30">
+              Cliente: {whiteLabel.clientName}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
+          <button
+            onClick={() => setWhiteLabelModalOpen(true)}
+            className="flex-1 sm:flex-none px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-medium font-mono flex items-center justify-center gap-1.5 transition-all border border-emerald-500/30 hover:border-emerald-500/60"
+            title="Adicionar logotipo do cliente e parecer técnico no PDF"
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            Personalizar Laudo (White-Label)
+          </button>
           {onNewScan && (
             <button
               onClick={onNewScan}
-              className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-all"
+              className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-all font-mono"
             >
               Nova Auditoria
             </button>
           )}
           <button
             onClick={() => window.print()}
-            className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+            className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 font-mono"
           >
             <Printer className="w-4 h-4" />
             Imprimir Relatório Completo (PDF)
@@ -409,6 +450,18 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
           >
             <KeyRound className="w-4 h-4 text-amber-400" />
             Vazamento de Segredos ({report.secretsAudit.totalLeaks})
+          </button>
+        )}
+
+        {report.kaliArsenal && (
+          <button
+            onClick={() => setActiveTab('kali')}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'kali' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Cpu className="w-4 h-4 text-cyan-400" />
+            Arsenal Kali ({report.kaliArsenal.enginesExecuted.length})
           </button>
         )}
       </div>
@@ -1230,13 +1283,71 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
       )}
 
       {/* ========================================================
+          SECTION 9: KALI ARSENAL ADVANCED ENGINES (SCREEN + PRINT)
+         ======================================================== */}
+      {report.kaliArsenal && (
+        <div className={`space-y-6 ${activeTab === 'kali' ? 'block' : 'hidden print:block print:mt-8 print-avoid-break'}`}>
+          <div className="p-6 rounded-xl bg-surface border border-surface-border space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-surface-border">
+              <h3 className="text-sm font-bold uppercase font-mono tracking-wider text-cyan-400 flex items-center gap-2">
+                <Cpu className="w-4 h-4" />
+                9. Orquestração do Arsenal Kali Linux & Motores Especializados
+              </h3>
+              <span className="text-xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/30">
+                {report.kaliArsenal.enginesExecuted.length} Motores Executados
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(report.kaliArsenal.results).map(([key, res]) => (
+                <div key={key} className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold font-mono text-white">{res.engineName}</span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                      res.mode === 'CLI_NATIVE' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-emerald-500/20 text-emerald-400'
+                    }`}>
+                      {res.mode === 'CLI_NATIVE' ? 'NATIVO CLI' : 'FALLBACK TS'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Duração da varredura: {res.durationMs}ms • Achados identificados: {res.findings.length}
+                  </p>
+                  {res.findings.length > 0 && (
+                    <div className="pt-2 border-t border-slate-900 space-y-1">
+                      {res.findings.map(f => (
+                        <div key={f.id} className="text-[11px] text-slate-300 flex items-center gap-1.5 font-mono">
+                          <span className="text-rose-400 font-bold">•</span>
+                          <span className="truncate">{f.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
           PRINT-ONLY OFFICIAL SIGN-OFF & CONTACT FOOTER
          ======================================================== */}
       <div className="hidden print:block mt-12 pt-6 border-t-2 border-slate-300 print-avoid-break">
+        {whiteLabel?.executiveOpinion && (
+          <div className="mb-6 p-4 rounded-lg bg-slate-100 border border-slate-300 text-xs">
+            <span className="font-bold text-slate-900 uppercase font-mono block mb-1">
+              PARECER TÉCNICO EXECUTIVO DO AUDITOR:
+            </span>
+            <p className="text-slate-800 leading-relaxed font-sans">{whiteLabel.executiveOpinion}</p>
+          </div>
+        )}
         <div className="flex items-center justify-between text-xs text-slate-600">
           <div>
             <p className="font-bold text-slate-900 text-sm">DEV & SEC — TECNOLOGIA QUE CONSTRÓI. SEGURANÇA QUE PROTEGE.</p>
-            <p className="text-slate-600 mt-0.5">Consultoria Especializada em Pentests, EASM, DevSecOps e Remediação de Vulnerabilidades.</p>
+            <p className="text-slate-600 mt-0.5">
+              Auditor Responsável: <strong>{whiteLabel?.consultantName || 'Equipe de Inteligência Cibernética'}</strong>
+              {whiteLabel?.consultantTitle ? ` (${whiteLabel.consultantTitle})` : ''}
+            </p>
             <p className="mt-1 font-mono text-[11px] text-slate-500">
               Portal Oficial: https://devesec.com • Atendimento Direto: WhatsApp Oficial Dev & Sec
             </p>

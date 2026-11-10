@@ -223,6 +223,14 @@ export interface ComplianceScorecard {
   items: ChecklistItem[];
 }
 
+export interface WhiteLabelConfig {
+  clientName?: string;
+  clientLogoUrl?: string;
+  consultantName?: string;
+  consultantTitle?: string;
+  executiveOpinion?: string;
+}
+
 export interface UnifiedAuditReport {
   id: string;
   timestamp: string;
@@ -248,6 +256,8 @@ export interface UnifiedAuditReport {
   mobileAudit?: MobileAuditData;
   cveData?: CveData;
   secretsAudit?: SecretAuditData;
+  kaliArsenal?: import('./kali-tools').KaliScanAggregation;
+  whiteLabel?: WhiteLabelConfig;
   commercialPitch: {
     leadMagnetTitle: string;
     recommendedService: string;

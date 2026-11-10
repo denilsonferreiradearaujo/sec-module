@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Search, Loader2, Shield, Globe, Terminal, CheckCircle2 } from 'lucide-react';
 import { UnifiedAuditReport } from '@/core/types/security';
+import { KaliArsenalConfig } from '@/core/types/kali-tools';
+import KaliArsenalSelector from './KaliArsenalSelector';
 
 interface UnifiedScannerFormProps {
   onScanComplete: (report: UnifiedAuditReport) => void;
@@ -14,6 +16,14 @@ export default function UnifiedScannerForm({ onScanComplete }: UnifiedScannerFor
   const [currentStep, setCurrentStep] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [safeMode, setSafeMode] = useState<boolean>(true);
+  const [kaliConfig, setKaliConfig] = useState<KaliArsenalConfig>({
+    nmap: false,
+    nikto: false,
+    gobuster: false,
+    nuclei: false,
+    sqlmap: false,
+    intensity: 'safe',
+  });
 
   const presets = ['google.com', 'cloudflare.com'];
 
@@ -34,7 +44,11 @@ export default function UnifiedScannerForm({ onScanComplete }: UnifiedScannerFor
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: target.trim(), safeMode }),
+        body: JSON.stringify({
+          target: target.trim(),
+          safeMode,
+          kaliArsenal: kaliConfig,
+        }),
       });
 
       clearTimeout(stepTimer1);
@@ -139,6 +153,11 @@ export default function UnifiedScannerForm({ onScanComplete }: UnifiedScannerFor
                 🛡️ Modo de Quarentena Isolado Ativo (Não envia requisições HTTP diretas ao alvo — seguro para URLs suspeitas de malware)
               </span>
             </label>
+          </div>
+
+          {/* Kali Arsenal Advanced Engines Selector */}
+          <div className="pt-1">
+            <KaliArsenalSelector config={kaliConfig} onChange={setKaliConfig} />
           </div>
 
           {/* Live Progress indicator */}
