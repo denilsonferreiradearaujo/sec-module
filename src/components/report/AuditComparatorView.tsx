@@ -5,20 +5,13 @@ import {
   ArrowRight,
   TrendingUp,
   ShieldCheck,
-  ShieldAlert,
   CheckCircle2,
-  AlertTriangle,
   Printer,
-  Sparkles,
-  RefreshCw,
   Search,
   Database,
-  Calendar,
   Clock,
-  Layers,
-  ChevronDown,
-  ChevronUp,
   Loader2,
+  X,
 } from 'lucide-react';
 import { UnifiedAuditReport } from '@/core/types/security';
 import { compareAudits } from '@/core/scoring/comparator';
@@ -38,21 +31,36 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [totalScansFound, setTotalScansFound] = useState<number>(0);
 
-  const [baselineJson, setBaselineJson] = useState('');
-  const [latestJson, setLatestJson] = useState('');
   const [comparison, setComparison] = useState<AuditComparisonResult | null>(
     initialBaseline && initialLatest ? compareAudits(initialBaseline, initialLatest) : null
   );
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [manualModeOpen, setManualModeOpen] = useState(false);
 
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const isSelectingTargetRef = useRef(false);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Search targets as user types
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+    if (isSelectingTargetRef.current) {
+      isSelectingTargetRef.current = false;
+      return;
+    }
 
     searchDebounceRef.current = setTimeout(async () => {
       try {
@@ -86,8 +94,9 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
   }, []);
 
   const selectTargetForCompare = async (target: string) => {
-    setSelectedTarget(target);
+    isSelectingTargetRef.current = true;
     setShowDropdown(false);
+    setSelectedTarget(target);
     setSearchTerm(target);
     setLoadingCompare(true);
     setError(null);
@@ -119,133 +128,24 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
     }
   };
 
-  // Load a demo scenario to demonstrate ROI
-  const loadDemoComparison = () => {
-    const demoBaseline: UnifiedAuditReport = {
-      id: 'scan-demo-baseline',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
-      target: 'portfolio.devesec.com',
-      targetType: 'domain',
-      overallScore: 38,
-      grade: 'F',
-      riskLevel: 'CRITICAL',
-      summary: {
-        criticalCount: 2,
-        highCount: 3,
-        mediumCount: 4,
-        lowCount: 2,
-        infoCount: 1,
-        headline: 'Múltiplas vulnerabilidades críticas expondo servidores e bancos.',
-      },
-      complianceScorecard: {
-        totalChecks: 10,
-        passedChecks: 3,
-        failedChecks: 6,
-        warningChecks: 1,
-        complianceRate: 30,
-        items: [],
-      },
-      findings: [
-        {
-          id: 'FIND-1',
-          title: 'Porta 3306 (MySQL) Exposta Publicamente na Internet',
-          description: 'A porta de banco de dados MySQL está aberta ao mundo.',
-          severity: 'CRITICAL',
-          remediation: 'Bloquear via Security Group.',
-          category: 'INFRASTRUCTURE',
-        },
-        {
-          id: 'FIND-2',
-          title: 'Arquivo .env Vazado com Chaves de Produção',
-          description: 'Variáveis de ambiente acessíveis publicamente via HTTP 200.',
-          severity: 'CRITICAL',
-          remediation: 'Bloquear acesso a arquivos ocultos.',
-          category: 'INFRASTRUCTURE',
-        },
-        {
-          id: 'FIND-3',
-          title: 'Cabeçalho HSTS Ausente',
-          description: 'Permite ataques de downgrade para HTTP inseguro.',
-          severity: 'HIGH',
-          remediation: 'Configurar Strict-Transport-Security.',
-          category: 'WEB_POSTURE',
-        },
-        {
-          id: 'FIND-4',
-          title: 'Proteção Anti-Clickjacking Ausente (X-Frame-Options)',
-          description: 'Permite que o site seja encapsulado em iframes.',
-          severity: 'MEDIUM',
-          remediation: 'Adicionar X-Frame-Options: SAMEORIGIN.',
-          category: 'WEB_POSTURE',
-        },
-      ],
-      commercialPitch: {
-        leadMagnetTitle: 'Pentest Web',
-        recommendedService: 'Consultoria Dev & Sec',
-        ctaMessage: 'Corrija imediatamente.',
-      },
-    };
+  const handleDeleteTarget = async (target: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
 
-    const demoLatest: UnifiedAuditReport = {
-      id: 'scan-demo-latest',
-      timestamp: new Date().toISOString(),
-      target: 'portfolio.devesec.com',
-      targetType: 'domain',
-      overallScore: 96,
-      grade: 'A',
-      riskLevel: 'LOW',
-      summary: {
-        criticalCount: 0,
-        highCount: 0,
-        mediumCount: 1,
-        lowCount: 1,
-        infoCount: 2,
-        headline: 'Postura de segurança blindada após consultoria da Dev & Sec.',
-      },
-      complianceScorecard: {
-        totalChecks: 10,
-        passedChecks: 9,
-        failedChecks: 0,
-        warningChecks: 1,
-        complianceRate: 90,
-        items: [],
-      },
-      findings: [
-        {
-          id: 'FIND-4',
-          title: 'Proteção Anti-Clickjacking Ausente (X-Frame-Options)',
-          description: 'Recomendação pendente de CSP frame-ancestors.',
-          severity: 'LOW',
-          remediation: 'Ajustar no CSP.',
-          category: 'WEB_POSTURE',
-        },
-      ],
-      commercialPitch: {
-        leadMagnetTitle: 'Manutenção Contínua',
-        recommendedService: 'Monitoramento EASM Dev & Sec',
-        ctaMessage: 'Mantenha sua empresa protegida 24/7.',
-      },
-    };
-
-    setSelectedTarget('portfolio.devesec.com');
-    setTotalScansFound(2);
-    setSearchTerm('portfolio.devesec.com');
-    setNotice(null);
-    setComparison(compareAudits(demoBaseline, demoLatest));
-  };
-
-  const handleManualCompare = () => {
-    setError(null);
     try {
-      if (!baselineJson.trim() || !latestJson.trim()) {
-        setError('Por favor, cole o JSON do Laudo Inicial e do Laudo Pós-Correção.');
-        return;
+      const res = await fetch(`/api/comparator/targets?target=${encodeURIComponent(target)}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setTargetSuggestions((prev) => prev.filter((item) => item.target !== target && item.normalizedTarget !== target));
+        if (selectedTarget === target) {
+          setSelectedTarget(null);
+          setComparison(null);
+          setSearchTerm('');
+        }
       }
-      const bReport = JSON.parse(baselineJson) as UnifiedAuditReport;
-      const lReport = JSON.parse(latestJson) as UnifiedAuditReport;
-      setComparison(compareAudits(bReport, lReport));
     } catch {
-      setError('Erro ao processar JSON. Certifique-se de colar relatórios válidos emitidos pela Dev & Sec.');
+      // ignore
     }
   };
 
@@ -266,15 +166,8 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
           </p>
         </div>
 
-        <div className="flex items-center gap-2 no-print">
-          <button
-            onClick={loadDemoComparison}
-            className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono flex items-center gap-2 transition-all border border-slate-700"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            Carregar Demonstração (portfolio.devesec.com)
-          </button>
-          {comparison && (
+        {comparison && (
+          <div className="flex items-center gap-2 no-print shrink-0">
             <button
               onClick={() => window.print()}
               className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all font-mono"
@@ -282,8 +175,8 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
               <Printer className="w-4 h-4" />
               Imprimir Laudo de Evolução (PDF)
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Real-time Target Search Bar (No manual typing required!) */}
@@ -293,7 +186,7 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
           Selecione o Alvo Auditado no Histórico (Autocompletar Inteligente):
         </label>
 
-        <div className="relative">
+        <div ref={searchBoxRef} className="relative">
           <div className="relative flex items-center">
             <div className="absolute left-4 text-slate-500 pointer-events-none">
               <Search className="w-4 h-4" />
@@ -314,6 +207,19 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
                 <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
               </div>
             )}
+            {searchTerm && !isSearching && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setShowDropdown(false);
+                }}
+                title="Limpar campo de busca"
+                className="absolute right-4 text-slate-500 hover:text-white p-1 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Autocomplete Dropdown */}
@@ -323,12 +229,12 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
                 <div
                   key={item.normalizedTarget}
                   onClick={() => selectTargetForCompare(item.target)}
-                  className="p-3.5 hover:bg-slate-900 cursor-pointer flex items-center justify-between gap-4 transition-colors"
+                  className="group relative p-3.5 hover:bg-slate-900 cursor-pointer flex items-center justify-between gap-4 transition-colors"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white text-sm">{item.target}</span>
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-white text-sm truncate max-w-xs sm:max-w-md">{item.target}</span>
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold shrink-0">
                         {item.totalScans} {item.totalScans === 1 ? 'Varredura' : 'Varreduras Gravadas'}
                       </span>
                     </div>
@@ -342,11 +248,21 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-500 block">Evolução</span>
-                    <span className="text-xs font-bold text-emerald-400">
-                      {item.baselineScore} ➔ {item.latestScore} ({item.latestGrade})
-                    </span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-500 block">Evolução</span>
+                      <span className="text-xs font-bold text-emerald-400">
+                        {item.baselineScore} ➔ {item.latestScore} ({item.latestGrade})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteTarget(item.target, e)}
+                      title={`Excluir "${item.target}" do histórico`}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -359,14 +275,26 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
           <div className="flex items-center gap-2 flex-wrap pt-1 text-xs font-mono">
             <span className="text-slate-500 text-[11px]">Alvos recentes no banco:</span>
             {targetSuggestions.slice(0, 4).map((s) => (
-              <button
+              <div
                 key={s.normalizedTarget}
-                type="button"
-                onClick={() => selectTargetForCompare(s.target)}
-                className="px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors"
+                className="inline-flex items-center rounded-md bg-slate-900 border border-slate-800 text-slate-300 text-xs overflow-hidden"
               >
-                {s.target} ({s.totalScans}x)
-              </button>
+                <button
+                  type="button"
+                  onClick={() => selectTargetForCompare(s.target)}
+                  className="px-2.5 py-1 hover:bg-slate-800 transition-colors"
+                >
+                  {s.target} ({s.totalScans}x)
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleDeleteTarget(s.target, e)}
+                  title={`Excluir ${s.target} do histórico`}
+                  className="px-1.5 py-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 border-l border-slate-800 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -519,44 +447,6 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
           </div>
         </div>
       )}
-
-      {/* Manual Mode Fallback (Expandable) */}
-      <div className="rounded-xl border border-slate-800 bg-surface/50 overflow-hidden no-print">
-        <div
-          onClick={() => setManualModeOpen(!manualModeOpen)}
-          className="p-4 flex items-center justify-between cursor-pointer select-none text-xs text-slate-400 hover:text-white"
-        >
-          <span>Ou colar relatórios manualmente via JSON</span>
-          {manualModeOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </div>
-
-        {manualModeOpen && (
-          <div className="p-6 pt-2 border-t border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <textarea
-              rows={5}
-              value={baselineJson}
-              onChange={(e) => setBaselineJson(e.target.value)}
-              placeholder="Cole o JSON do laudo inicial..."
-              className="p-3 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono text-white"
-            />
-            <textarea
-              rows={5}
-              value={latestJson}
-              onChange={(e) => setLatestJson(e.target.value)}
-              placeholder="Cole o JSON do laudo recente..."
-              className="p-3 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono text-white"
-            />
-            <div className="md:col-span-2 flex justify-end">
-              <button
-                onClick={handleManualCompare}
-                className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase font-mono"
-              >
-                Processar JSON Manual
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

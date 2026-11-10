@@ -314,26 +314,35 @@ export async function scanThreatIntel(target: string): Promise<{ data: ThreatInt
                 permalink: `https://www.virustotal.com/gui/url/${cId}`,
               };
 
-              threatData.isMalicious = true;
+              const flaggedCount = maliciousVotes > 0 ? maliciousVotes : suspiciousVotes;
+              const threatCategory = maliciousVotes > 0 ? 'Malicioso' : 'Suspeito / Spam';
+              threatData.isMalicious = maliciousVotes > 0;
               threatData.blacklists[0].listed = true;
-              threatData.blacklists[0].details = `Classificado como malicioso por ${maliciousVotes} motor(es) globais (ex: ${detectedEngines.slice(0, 3).join(', ')}). Variação detectada: ${candidate}`;
+              threatData.blacklists[0].details = `Sinalizado por ${flaggedCount} motor(es) globais como ${threatCategory} (ex: ${detectedEngines.slice(0, 3).join(', ')}). Alvo: ${candidate}`;
 
-              const isEvasion = candidate !== rawTarget;
+              const normalizedRaw = rawTarget.toLowerCase().replace(/^https?:\/\//i, '').replace(/\/$/, '');
+              const normalizedCand = candidate.toLowerCase().replace(/^https?:\/\//i, '').replace(/\/$/, '');
+              const isEvasion = normalizedCand !== normalizedRaw;
+
+              const titleText = isEvasion
+                ? `Tentativa de Evasão Detectada: Ameaça Confirmada por Variação (${flaggedCount}/${totalEngines} Motores - ${threatCategory})!`
+                : `Ameaça Detectada: Sinalizado por ${flaggedCount}/${totalEngines} Motores Globais (${threatCategory})!`;
+
               findings.push({
                 id: 'THREAT-MULTI-ENGINE-MALWARE-CONFIRMED',
-                title: isEvasion
-                  ? `Tentativa de Evasão Detectada: Ameaça Confirmada por Variação de Caminho (${maliciousVotes}/${totalEngines} Motores)!`
-                  : `Ameaça Confirmada: Detectado como Malicioso por ${maliciousVotes}/${totalEngines} Motores de Proteção!`,
+                title: titleText,
                 description: isEvasion
-                  ? `Motores de segurança globais (incluindo: ${detectedEngines.join(', ')}) classificaram o caminho base "${candidate}" como malicioso/phishing. O atacante tentou mascarar a detecção inserindo parâmetros dinâmicos ou redirecionamentos.`
-                  : `Motores de segurança globais (incluindo: ${detectedEngines.join(', ')}) classificaram este alvo diretamente como malicioso.`,
-                severity: 'CRITICAL',
-                remediation: 'Bloqueie imediatamente o endereço em Proxies, Gateways e Firewalls (EDR/SIEM). Não tente abrir o endereço.',
+                  ? `Motores de segurança globais (incluindo: ${detectedEngines.join(', ')}) classificaram o caminho base "${candidate}" como ${threatCategory.toLowerCase()}. O atacante tentou mascarar a detecção inserindo parâmetros dinâmicos ou redirecionamentos.`
+                  : `Motores de segurança globais (incluindo: ${detectedEngines.join(', ')}) classificaram este endereço como ${threatCategory.toLowerCase()}.`,
+                severity: maliciousVotes > 0 ? 'CRITICAL' : 'HIGH',
+                remediation: 'Bloqueie imediatamente o endereço em Proxies, Gateways e Firewalls (EDR/SIEM). Não tente abrir o endereço no navegador.',
                 category: 'THREAT_INTEL',
                 cveOrStandard: isEvasion ? 'MITRE ATT&CK T1566 (Phishing / Defense Evasion)' : 'Global Threat Intelligence',
-                impact: 'Infecção de endpoints, roubo de credenciais ou execução remota de código.',
+                impact: maliciousVotes > 0
+                  ? 'Infecção de endpoints, roubo de credenciais ou execução remota de código.'
+                  : 'Risco de redirecionamento para campanhas de spam, phishing ou tráfego malicioso (TDS).',
               });
-              threatData.moduleScore -= 50;
+              threatData.moduleScore -= maliciousVotes > 0 ? 50 : 30;
               break; // Threat detected, no need to query further candidates
             }
           }

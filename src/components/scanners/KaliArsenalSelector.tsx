@@ -76,7 +76,15 @@ export default function KaliArsenalSelector({ config, onChange }: KaliArsenalSel
               Orquestração híbrida pronta
             </span>
           )}
-          <button className="text-slate-400 p-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="text-slate-400 p-1 hover:text-white"
+          >
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>

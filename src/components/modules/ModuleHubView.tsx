@@ -14,6 +14,7 @@ import {
   Terminal,
   Cpu,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 
 interface SecurityModuleCard {
@@ -95,6 +96,17 @@ export default function ModuleHubView() {
       href: '/mobile',
       accentColor: 'border-violet-500/30 hover:border-violet-500/60 bg-violet-500/5',
       toolsIncluded: ['Manifest Analyzer', 'Permission Auditor', 'OWASP MASVS'],
+    },
+    {
+      id: 'docs',
+      title: 'Guia Operacional & Documentação Visual',
+      category: 'BASE DE CONHECIMENTO & DOCS',
+      description: 'Explicações detalhadas de cada módulo, cabeçalho de proteção (HSTS, CSP), testes do Arsenal Kali Linux, scripts de Wi-Fi e procedimentos defensivos para o operador.',
+      icon: <BookOpen className="w-6 h-6 text-emerald-400" />,
+      badge: 'Documentação',
+      href: '/docs',
+      accentColor: 'border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/5',
+      toolsIncluded: ['Manual Técnico', 'Exemplos Práticos', 'Cenários de Ataque', 'Glossário'],
     },
   ];
 

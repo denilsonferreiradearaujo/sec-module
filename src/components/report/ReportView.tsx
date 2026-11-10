@@ -148,25 +148,25 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
       </div>
 
       {/* Top Action Bar (Screen Only) */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-surface border border-surface-border no-print">
-        <div className="flex items-center gap-3">
-          <span className="text-xs uppercase font-mono tracking-wider text-slate-400">Alvo Auditado:</span>
-          <span className="text-base font-bold text-white font-mono bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-4 rounded-xl bg-surface border border-surface-border no-print overflow-hidden">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+          <span className="text-xs uppercase font-mono tracking-wider text-slate-400 shrink-0">Alvo Auditado:</span>
+          <span className="text-sm sm:text-base font-bold text-white font-mono bg-slate-900 px-3 py-1 rounded-lg border border-slate-800 truncate max-w-[260px] sm:max-w-sm md:max-w-md lg:max-w-lg" title={report.target}>
             {report.target}
           </span>
-          <span className="text-xs text-slate-500 font-mono">
+          <span className="text-xs text-slate-500 font-mono shrink-0">
             {new Date(report.timestamp).toLocaleString('pt-BR')}
           </span>
           {whiteLabel?.clientName && (
-            <span className="text-xs text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/30">
+            <span className="text-xs text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/30 shrink-0">
               Cliente: {whiteLabel.clientName}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full lg:w-auto shrink-0">
           <button
             onClick={() => setWhiteLabelModalOpen(true)}
-            className="flex-1 sm:flex-none px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-medium font-mono flex items-center justify-center gap-1.5 transition-all border border-emerald-500/30 hover:border-emerald-500/60"
+            className="flex-1 sm:flex-none px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-medium font-mono flex items-center justify-center gap-1.5 transition-all border border-emerald-500/30 hover:border-emerald-500/60 whitespace-nowrap"
             title="Adicionar logotipo do cliente e parecer técnico no PDF"
           >
             <Building2 className="w-3.5 h-3.5" />
@@ -175,17 +175,17 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
           {onNewScan && (
             <button
               onClick={onNewScan}
-              className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-all font-mono"
+              className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-all font-mono whitespace-nowrap"
             >
               Nova Auditoria
             </button>
           )}
           <button
             onClick={() => window.print()}
-            className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 font-mono"
+            className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 font-mono whitespace-nowrap"
           >
             <Printer className="w-4 h-4" />
-            Imprimir Relatório Completo (PDF)
+            Imprimir Relatório
           </button>
         </div>
       </div>

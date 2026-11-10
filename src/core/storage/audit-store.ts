@@ -135,3 +135,20 @@ export async function getBaselineAndLatest(target: string): Promise<{ baseline: 
     return null;
   }
 }
+
+export async function deleteTargetAudits(target: string): Promise<boolean> {
+  await ensureDir();
+  const norm = normalizeTarget(target);
+  try {
+    const files = await fs.readdir(DATA_DIR);
+    const targetFiles = files.filter(f => f.startsWith(`${norm}__`) && f.endsWith('.json'));
+    for (const file of targetFiles) {
+      await fs.unlink(path.join(DATA_DIR, file));
+    }
+    return true;
+  } catch (err) {
+    console.error('Erro ao deletar laudos para o alvo:', err);
+    return false;
+  }
+}
+
