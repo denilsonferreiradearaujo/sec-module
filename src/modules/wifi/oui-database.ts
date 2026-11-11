@@ -1,0 +1,261 @@
+// Dicionário OUI (Organizationally Unique Identifier) dos principais fabricantes de equipamentos de rede e dispositivos
+const OUI_MAP: Record<string, string> = {
+  // Apple
+  '00:03:93': 'Apple Inc.',
+  '00:05:02': 'Apple Inc.',
+  '00:10:fa': 'Apple Inc.',
+  '00:17:f2': 'Apple Inc.',
+  '00:1e:c2': 'Apple Inc.',
+  '14:20:5e': 'Apple Inc.',
+  '14:99:e2': 'Apple Inc.',
+  '18:65:90': 'Apple Inc.',
+  '18:af:61': 'Apple Inc.',
+  '28:6a:ba': 'Apple Inc.',
+  '34:36:3b': 'Apple Inc.',
+  '3c:06:30': 'Apple Inc.',
+  '40:98:ad': 'Apple Inc.',
+  '48:d7:05': 'Apple Inc.',
+  '50:ed:3c': 'Apple Inc.',
+  '60:03:08': 'Apple Inc.',
+  '68:fe:f7': 'Apple Inc.',
+  '70:3e:ac': 'Apple Inc.',
+  '7c:6d:62': 'Apple Inc.',
+  '80:e6:50': 'Apple Inc.',
+  '88:66:a5': 'Apple Inc.',
+  '90:b9:31': 'Apple Inc.',
+  'a4:83:e7': 'Apple Inc.',
+  'a8:20:66': 'Apple Inc.',
+  'ac:bc:32': 'Apple Inc.',
+  'b8:78:26': 'Apple Inc.',
+  'bc:d0:74': 'Apple Inc.',
+  'c8:6f:1d': 'Apple Inc.',
+  'dc:a9:04': 'Apple Inc.',
+  'e4:9a:79': 'Apple Inc.',
+  'f0:18:98': 'Apple Inc.',
+  'f4:5c:89': 'Apple Inc.',
+
+  // Samsung
+  '00:07:ab': 'Samsung Electronics',
+  '00:12:47': 'Samsung Electronics',
+  '00:15:99': 'Samsung Electronics',
+  '00:24:54': 'Samsung Electronics',
+  '08:fc:52': 'Samsung Electronics',
+  '14:49:e0': 'Samsung Electronics',
+  '24:4b:03': 'Samsung Electronics',
+  '2c:4d:54': 'Samsung Electronics',
+  '38:01:46': 'Samsung Electronics',
+  '40:0e:85': 'Samsung Electronics',
+  '4c:66:41': 'Samsung Electronics',
+  '50:01:d9': 'Samsung Electronics',
+  '5c:f6:dc': 'Samsung Electronics',
+  '64:b5:c6': 'Samsung Electronics',
+  '78:40:e4': 'Samsung Electronics',
+  '8c:77:12': 'Samsung Electronics',
+  '94:65:2d': 'Samsung Electronics',
+  'a0:07:98': 'Samsung Electronics',
+  'b4:07:f9': 'Samsung Electronics',
+  'c0:bd:d1': 'Samsung Electronics',
+  'd0:59:e4': 'Samsung Electronics',
+  'e4:b0:21': 'Samsung Electronics',
+  'f4:7b:5e': 'Samsung Electronics',
+
+  // Intel (muito comum em notebooks Windows corporativos)
+  '00:02:b3': 'Intel Corporate',
+  '00:03:47': 'Intel Corporate',
+  '00:13:02': 'Intel Corporate',
+  '00:1b:21': 'Intel Corporate',
+  '14:4f:8a': 'Intel Corporate',
+  '24:77:03': 'Intel Corporate',
+  '34:13:e8': 'Intel Corporate',
+  '40:b0:34': 'Intel Corporate',
+  '48:51:b7': 'Intel Corporate',
+  '5c:87:9c': 'Intel Corporate',
+  '68:05:ca': 'Intel Corporate',
+  '80:86:f2': 'Intel Corporate',
+  'a4:4c:c8': 'Intel Corporate',
+  'ac:fd:ce': 'Intel Corporate',
+  'cc:b0:da': 'Intel Corporate',
+  'dc:53:60': 'Intel Corporate',
+  'f8:59:71': 'Intel Corporate',
+
+  // TP-Link
+  '00:14:78': 'TP-Link Technologies',
+  '00:1d:0f': 'TP-Link Technologies',
+  '00:25:86': 'TP-Link Technologies',
+  '10:da:43': 'TP-Link Technologies',
+  '14:cc:20': 'TP-Link Technologies',
+  '18:d6:c7': 'TP-Link Technologies',
+  '30:b5:c2': 'TP-Link Technologies',
+  '50:c7:bf': 'TP-Link Technologies',
+  '60:e3:27': 'TP-Link Technologies',
+  '70:4f:57': 'TP-Link Technologies',
+  '98:48:27': 'TP-Link Technologies',
+  'a4:2b:b0': 'TP-Link Technologies',
+  'b0:4e:26': 'TP-Link Technologies',
+  'c0:06:c3': 'TP-Link Technologies',
+  'd8:07:b6': 'TP-Link Technologies',
+  'e8:48:b8': 'TP-Link Technologies',
+
+  // Ubiquiti Networks / UniFi
+  '00:15:6d': 'Ubiquiti Networks',
+  '00:27:22': 'Ubiquiti Networks',
+  '24:a4:3c': 'Ubiquiti Networks',
+  '68:d7:9a': 'Ubiquiti Networks',
+  '78:8a:20': 'Ubiquiti Networks',
+  '80:2a:a8': 'Ubiquiti Networks',
+  'b4:fb:e4': 'Ubiquiti Networks',
+  'dc:9f:db': 'Ubiquiti Networks',
+  'f0:9f:c2': 'Ubiquiti Networks',
+
+  // Cisco / Linksys
+  '00:00:0c': 'Cisco Systems',
+  '00:01:42': 'Cisco Systems',
+  '00:0c:85': 'Cisco Systems',
+  '00:14:1b': 'Cisco Systems',
+  '00:17:59': 'Cisco Systems',
+  '00:1a:2f': 'Cisco Systems',
+  '00:24:97': 'Cisco Systems',
+  '70:81:05': 'Cisco Systems',
+
+  // Dell
+  '00:06:5b': 'Dell Inc.',
+  '00:08:74': 'Dell Inc.',
+  '00:14:22': 'Dell Inc.',
+  '00:18:8b': 'Dell Inc.',
+  '14:18:77': 'Dell Inc.',
+  '18:03:73': 'Dell Inc.',
+  '24:b6:fd': 'Dell Inc.',
+  '54:48:10': 'Dell Inc.',
+  '74:86:7a': 'Dell Inc.',
+  'b8:ac:6f': 'Dell Inc.',
+  'd4:81:d7': 'Dell Inc.',
+  'ec:f4:bb': 'Dell Inc.',
+
+  // HP / Hewlett Packard
+  '00:08:02': 'HP Inc.',
+  '00:0b:cd': 'HP Inc.',
+  '00:18:71': 'HP Inc.',
+  '00:21:5a': 'HP Inc.',
+  '00:25:b3': 'HP Inc.',
+  '10:e7:c6': 'HP Inc.',
+  '2c:41:38': 'HP Inc.',
+  '3c:d9:2b': 'HP Inc.',
+  '58:20:b1': 'HP Inc.',
+  'a4:5d:36': 'HP Inc.',
+  'c8:cb:b8': 'HP Inc.',
+
+  // Lenovo / Motorola
+  '00:19:70': 'Lenovo',
+  '00:21:cc': 'Lenovo',
+  '04:76:6e': 'Lenovo',
+  '28:6c:07': 'Lenovo',
+  '40:23:43': 'Motorola Mobility',
+  '50:50:65': 'Lenovo',
+  '84:ef:18': 'Motorola Mobility',
+  'e4:b3:18': 'Lenovo',
+  'f8:cf:c5': 'Motorola Mobility',
+
+  // Xiaomi
+  '0c:98:38': 'Xiaomi Communications',
+  '18:59:36': 'Xiaomi Communications',
+  '34:80:0d': 'Xiaomi Communications',
+  '50:64:2b': 'Xiaomi Communications',
+  '64:cc:2e': 'Xiaomi Communications',
+  '78:11:dc': 'Xiaomi Communications',
+  'ac:c1:ee': 'Xiaomi Communications',
+  'd4:97:0b': 'Xiaomi Communications',
+
+  // Huawei
+  '00:1e:10': 'Huawei Technologies',
+  '00:25:9e': 'Huawei Technologies',
+  '08:19:a6': 'Huawei Technologies',
+  '10:47:80': 'Huawei Technologies',
+  '20:2b:c1': 'Huawei Technologies',
+  '48:46:fb': 'Huawei Technologies',
+  '80:b6:86': 'Huawei Technologies',
+
+  // Intelbras / Equipamentos Brasileiros
+  '00:1a:3f': 'Intelbras S.A.',
+  '14:a3:64': 'Intelbras S.A.',
+  '28:28:5d': 'Intelbras S.A.',
+  '4c:ed:fb': 'Intelbras S.A.',
+  '58:10:8c': 'Intelbras S.A.',
+  'a0:d0:dc': 'Intelbras S.A.',
+  'c8:8d:83': 'Intelbras S.A.',
+  'ec:22:80': 'Intelbras S.A.',
+
+  // Hikvision & Dahua (Câmeras IP / DVR / NVR)
+  '00:12:12': 'Hikvision Digital Technology',
+  '44:19:b6': 'Hikvision Digital Technology',
+  '50:ec:50': 'Hikvision Digital Technology',
+  'bc:ba:e1': 'Hikvision Digital Technology',
+  'c4:2f:90': 'Hikvision Digital Technology',
+  'e0:50:8b': 'Dahua Technology',
+  '3c:ef:8c': 'Dahua Technology',
+
+  // LG & Sony (Smart TVs)
+  '00:1c:62': 'LG Electronics',
+  '10:f9:6f': 'LG Electronics',
+  '20:3d:66': 'LG Electronics',
+  '38:8c:50': 'LG Electronics',
+  '58:fd:b3': 'LG Electronics',
+  'a8:23:fe': 'LG Electronics',
+  '00:19:c7': 'Sony Corporation',
+  'f0:bf:97': 'Sony Corporation',
+
+  // D-Link
+  '00:05:5d': 'D-Link Corporation',
+  '00:0d:88': 'D-Link Corporation',
+  '00:13:46': 'D-Link Corporation',
+  '14:d6:4d': 'D-Link Corporation',
+  '28:10:7b': 'D-Link Corporation',
+  '78:54:2e': 'D-Link Corporation',
+
+  // Asus
+  '00:15:f2': 'Asustek Computer',
+  '04:d9:f5': 'Asustek Computer',
+  '10:bf:48': 'Asustek Computer',
+  '38:2c:4a': 'Asustek Computer',
+  '60:45:cb': 'Asustek Computer',
+
+  // Espressif / Tuya / Sonoff (IoT, lâmpadas, tomadas inteligentes)
+  '24:0a:c4': 'Espressif Inc. (Dispositivo IoT)',
+  '24:6f:28': 'Espressif Inc. (Dispositivo IoT)',
+  '30:ae:a4': 'Espressif Inc. (Dispositivo IoT)',
+  '84:0d:8e': 'Espressif Inc. (Dispositivo IoT)',
+  '84:f3:eb': 'Espressif Inc. (Dispositivo IoT)',
+  'a4:e5:7c': 'Espressif Inc. (Dispositivo IoT)',
+  'bc:dd:c2': 'Espressif Inc. (Dispositivo IoT)',
+  'dc:4f:22': 'Espressif Inc. (Dispositivo IoT)',
+
+  // Google / Chromecast / Nest
+  '30:fd:38': 'Google Inc.',
+  '48:b0:2d': 'Google Inc.',
+  '54:60:09': 'Google Inc.',
+  'a4:77:33': 'Google Inc.',
+  'f8:8f:12': 'Google Inc.',
+
+  // Amazon (Echo / Fire TV)
+  '38:f7:3d': 'Amazon Technologies',
+  '40:b4:cd': 'Amazon Technologies',
+  '68:37:e9': 'Amazon Technologies',
+  '74:75:48': 'Amazon Technologies',
+  'ac:63:be': 'Amazon Technologies',
+
+  // Roteadores Vivo / Claro / Oi / Net (Sagemcom / Mitrastar / ZTE / Technicolor)
+  '10:98:5f': 'Sagemcom Broadband (Roteador Fibra)',
+  '00:1c:a8': 'Mitrastar Technology',
+  '40:4d:8e': 'Mitrastar Technology',
+  '70:2e:22': 'Technicolor / Vantiva',
+  'a4:52:6f': 'ZTE Corporation',
+  '00:1f:a4': 'ZTE Corporation',
+};
+
+export function resolveMacVendor(mac?: string): string {
+  if (!mac) return 'Fabricante Desconhecido';
+  const cleanMac = mac.replace(/[:-]/g, '').toLowerCase();
+  if (cleanMac.length < 6) return 'Fabricante Desconhecido';
+
+  const prefix = `${cleanMac.slice(0, 2)}:${cleanMac.slice(2, 4)}:${cleanMac.slice(4, 6)}`;
+  return OUI_MAP[prefix] || 'Dispositivo de Rede Genérico';
+}

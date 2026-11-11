@@ -1,20 +1,15 @@
-'use client';
+import React from 'react';
+import ModuleHubView from '@/components/modules/ModuleHubView';
 
-import React, { useState } from 'react';
-import UnifiedScannerForm from '@/components/scanners/UnifiedScannerForm';
-import ReportView from '@/components/report/ReportView';
-import { UnifiedAuditReport } from '@/core/types/security';
+export const metadata = {
+  title: 'DEV & SEC Suite 2.0 | Painel de Módulos de Segurança',
+  description: 'Painel unificado com todos os módulos de cibersegurança e auditoria da Dev & Sec.',
+};
 
 export default function HomePage() {
-  const [report, setReport] = useState<UnifiedAuditReport | null>(null);
-
   return (
-    <div className="space-y-12">
-      {!report ? (
-        <UnifiedScannerForm onScanComplete={(newReport) => setReport(newReport)} />
-      ) : (
-        <ReportView report={report} onNewScan={() => setReport(null)} />
-      )}
+    <div className="py-4">
+      <ModuleHubView />
     </div>
   );
 }

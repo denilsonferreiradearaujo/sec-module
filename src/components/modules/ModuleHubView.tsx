@@ -38,7 +38,7 @@ export default function ModuleHubView() {
       description: 'Varredura unificada de portas, DNS RFC 7489, certificados SSL, cabeçalhos defensivos e orquestração de Nmap, Nikto, Gobuster/FFUF, Nuclei e SQLmap.',
       icon: <Globe className="w-6 h-6 text-emerald-400" />,
       badge: 'Principal',
-      href: '/',
+      href: '/scanner',
       accentColor: 'border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/5',
       toolsIncluded: ['Nmap', 'Nikto', 'Gobuster', 'Nuclei', 'SQLmap', 'NIST NVD'],
     },

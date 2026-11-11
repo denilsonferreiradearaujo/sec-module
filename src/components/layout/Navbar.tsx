@@ -25,20 +25,16 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-6 text-xs font-mono font-medium">
-          <Link href="/" className="flex items-center gap-1.5 text-slate-300 hover:text-emerald-400 transition-colors">
-            <Globe className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Scanner Central</span>
-          </Link>
-          <Link href="/modules" className="flex items-center gap-1.5 text-slate-300 hover:text-emerald-400 transition-colors">
+        {/* Right CTA & Nav */}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-emerald-500/40 text-xs font-mono transition-all"
+          >
             <LayoutGrid className="w-3.5 h-3.5 text-emerald-400" />
             <span>Painel de Módulos</span>
           </Link>
-        </nav>
 
-        {/* Right CTA */}
-        <div className="flex items-center gap-3">
           <Link
             href="/docs"
             className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-emerald-500/40 text-xs font-mono transition-all"
@@ -75,16 +71,24 @@ export default function Navbar() {
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center gap-2 p-2 rounded-lg text-slate-300 hover:bg-slate-900 hover:text-emerald-400"
           >
-            <Globe className="w-4 h-4 text-emerald-400" />
-            Scanner Central & Arsenal Kali
+            <LayoutGrid className="w-4 h-4 text-emerald-400" />
+            Painel de Módulos
           </Link>
           <Link
-            href="/modules"
+            href="/docs"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center gap-2 p-2 rounded-lg text-slate-300 hover:bg-slate-900 hover:text-emerald-400"
           >
-            <LayoutGrid className="w-4 h-4 text-emerald-400" />
-            Painel de Todos os Módulos
+            <BookOpen className="w-4 h-4 text-emerald-400" />
+            Guia & Docs
+          </Link>
+          <Link
+            href="/scanner"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center gap-2 p-2 rounded-lg text-slate-300 hover:bg-slate-900 hover:text-emerald-400"
+          >
+            <Globe className="w-4 h-4 text-emerald-400" />
+            Scanner Central & Arsenal Kali
           </Link>
           <Link
             href="/wifi"

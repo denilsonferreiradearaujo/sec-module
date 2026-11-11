@@ -33,3 +33,5 @@ next-env.d.ts
 
 # local data storage (scans, phishing campaigns, audit cache)
 /data/
+devesec-wifi-result.json
+*-result.json

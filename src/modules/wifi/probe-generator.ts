@@ -20,15 +20,163 @@ export function generateWifiProbePowerShellScript(options?: WifiProbeScriptOptio
 Write-Host "[+] Iniciando Auditoria Wi-Fi Dev & Sec no Windows..." -ForegroundColor Cyan
 Write-Host "[+] Cliente: ${company}" -ForegroundColor Gray
 
-# 1. Verificar interface Wi-Fi ativa
+# 1. Verificar interface Wi-Fi ativa e coletar dados da placa / conexao
 $interfaceInfo = netsh wlan show interfaces
-if ($interfaceInfo -match "State\\s+:\\s+connected|disconnected") {
-    Write-Host "[+] Placa Wi-Fi detectada com sucesso." -ForegroundColor Green
-} else {
-    Write-Host "[-] Nenhuma placa de rede sem fio ativa encontrada no Windows." -ForegroundColor Red
-    exit 1
+$cardDescription = ""
+$adapterMac = ""
+$connSsid = ""
+$connBssid = ""
+$connRadio = ""
+$connChannel = 0
+$connSignal = 0
+$connAuth = ""
+$connCipher = ""
+$connRx = 0
+$connTx = 0
+
+foreach ($line in ($interfaceInfo -split "\`r?\`n")) {
+    $t = $line.Trim()
+    if ($t -match "^(Descri|Description)[^:]*:\\s*(.+)$") {
+        if ([string]::IsNullOrWhiteSpace($cardDescription)) { $cardDescription = $matches[2].Trim() }
+    }
+    elseif ($t -match "^(Endere|Physical address)[^:]*:\\s*(.+)$") {
+        if ([string]::IsNullOrWhiteSpace($adapterMac)) { $adapterMac = $matches[2].Trim() }
+    }
+    elseif ($t -match "^SSID[^:]*:\\s*(.+)$") {
+        if ([string]::IsNullOrWhiteSpace($connSsid)) { $connSsid = $matches[1].Trim() }
+    }
+    elseif ($t -match "^BSSID[^:]*:\\s*(.+)$") {
+        if ([string]::IsNullOrWhiteSpace($connBssid)) { $connBssid = $matches[1].Trim() }
+    }
+    elseif ($t -match "^(Radio type|Tipo de r.dio)[^:]*:\\s*(.+)$") {
+        if ([string]::IsNullOrWhiteSpace($connRadio)) { $connRadio = $matches[2].Trim() }
+    }
+    elseif ($t -match "^(Autenti|Authentication)[^:]*:\\s*(.+)$") {
+        if ([string]::IsNullOrWhiteSpace($connAuth)) { $connAuth = $matches[2].Trim() }
+    }
+    elseif ($t -match "^(Codifica|Criptografia|Encryption|Cipher)[^:]*:\\s*(.+)$") {
+        if ([string]::IsNullOrWhiteSpace($connCipher)) { $connCipher = $matches[2].Trim() }
+    }
+    elseif ($t -match "^(Canal|Channel)\\s*:\\s*(\\d+)") {
+        if ($connChannel -eq 0) { $connChannel = [int]$matches[2] }
+    }
+    elseif ($t -match "^(Sinal|Signal)\\s*:\\s*(\\d+)%") {
+        if ($connSignal -eq 0) { $connSignal = [int]$matches[2] }
+    }
+    elseif ($t -match "^(Taxa de recep|Receive rate).*\\s*:\\s*([\\d\\.]+)") {
+        if ($connRx -eq 0) { $connRx = [double]$matches[2] }
+    }
+    elseif ($t -match "^(Taxa de transmiss|Transmit rate).*\\s*:\\s*([\\d\\.]+)") {
+        if ($connTx -eq 0) { $connTx = [double]$matches[2] }
+    }
 }
 
+if ([string]::IsNullOrWhiteSpace($cardDescription)) {
+    if ($interfaceInfo -match "(State|Estado)\\s*:\\s*(connected|disconnected|Conectado|Desconectado)" -or $interfaceInfo -match "GUID\\s*:" -or $interfaceInfo -match "Wi-Fi") {
+        $cardDescription = "Placa de Rede Sem Fio 802.11"
+    } else {
+        Write-Host "[-] Nenhuma placa de rede sem fio ativa encontrada no Windows." -ForegroundColor Red
+        exit 1
+    }
+}
+
+Write-Host "[+] Placa Wi-Fi detectada: $cardDescription ($adapterMac)" -ForegroundColor Green
+if (-not [string]::IsNullOrWhiteSpace($connSsid)) {
+    Write-Host "[+] Conectado a rede: $connSsid (BSSID: $connBssid | Canal: $connChannel | Sinal: $connSignal%)" -ForegroundColor Cyan
+}
+
+# 2. Descobrir aparelhos conectados na rede local (Hostnames, Portas, Gateway)
+Write-Host "[+] Mapeando aparelhos conectados na sub-rede local..." -ForegroundColor Cyan
+$devices = @()
+$seenIps = @{}
+
+# Descobrir IP local do host na interface ativa da rota padrao (Wi-Fi)
+$localHostIp = ""
+try {
+    $defRoute = Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Select-Object -First 1
+    if ($defRoute) {
+        $localHostIp = (Get-NetIPAddress -InterfaceIndex $defRoute.InterfaceIndex -AddressFamily IPv4 | Select-Object -First 1).IPAddress
+    }
+} catch {}
+
+# Adicionar o Host do Auditor se encontrado
+if ($localHostIp -and -not [string]::IsNullOrWhiteSpace($adapterMac)) {
+    $seenIps[$localHostIp] = $true
+    $devices += [PSCustomObject]@{
+        ip = $localHostIp
+        mac = $adapterMac.ToLower()
+        type = "DEVICE"
+        hostname = $env:COMPUTERNAME
+        category = "WORKSTATION"
+        openPorts = @()
+        isApIsolationVulnerable = $false
+    }
+}
+
+# Descobrir vizinhos via ARP e resolver hostnames / portas
+$rawArp = arp -a
+foreach ($line in ($rawArp -split "\`r?\`n")) {
+    $t = $line.Trim()
+    if ($t -match "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\s+([0-9a-fA-F\\-]{17})\\s+(\\S+)") {
+        $ip = $matches[1]
+        $mac = $matches[2].Replace("-", ":").ToLower()
+        if ($ip -notmatch "^(224\\.|239\\.|255\\.)" -and $ip -notmatch "\\.255$" -and -not $seenIps.ContainsKey($ip)) {
+            $seenIps[$ip] = $true
+            $devType = "DEVICE"
+            $cat = "OTHER"
+            if ($ip -match "\\.1$" -or ($connBssid -and $mac.StartsWith($connBssid.Substring(0, 8).ToLower()))) {
+                $devType = "GATEWAY"
+                $cat = "GATEWAY"
+            }
+
+            # Resolução de Hostname via DNS reverso
+            $hostName = ""
+            try {
+                $dnsEntry = [System.Net.Dns]::GetHostEntry($ip)
+                if ($dnsEntry -and $dnsEntry.HostName) { $hostName = $dnsEntry.HostName }
+            } catch {}
+
+            # Checagem não-invasiva de portas de gerenciamento (80, 443, 445, 22, 3389)
+            $openPorts = @()
+            $portsToCheck = @(80, 443, 445, 22, 3389)
+            foreach ($p in $portsToCheck) {
+                try {
+                    $tcp = New-Object System.Net.Sockets.TcpClient
+                    $ar = $tcp.BeginConnect($ip, $p, $null, $null)
+                    $wait = $ar.AsyncWaitHandle.WaitOne(120, $false)
+                    if ($wait -and $tcp.Connected) {
+                        $openPorts += $p
+                    }
+                    $tcp.Close()
+                } catch {}
+            }
+
+            $devices += [PSCustomObject]@{
+                ip = $ip
+                mac = $mac
+                type = $devType
+                hostname = $hostName
+                category = $cat
+                openPorts = $openPorts
+                isApIsolationVulnerable = ($devType -ne "GATEWAY")
+            }
+        }
+    }
+}
+
+# Avaliar Isolamento de Clientes (AP Isolation)
+$clientDevicesCount = ($devices | Where-Object { $_.type -ne "GATEWAY" -and $_.ip -ne $localHostIp }).Count
+$apIsolationEffective = ($clientDevicesCount -eq 0)
+
+Write-Host "[+] Dispositivos ativos identificados na rede: $($devices.Count)" -ForegroundColor Gray
+foreach ($d in $devices) {
+    $infoExtra = ""
+    if ($d.hostname) { $infoExtra += " ($($d.hostname))" }
+    if ($d.openPorts.Count -gt 0) { $infoExtra += " [Portas: $($d.openPorts -join ',')]" }
+    Write-Host "    - [$($d.type)] $($d.ip) - MAC: $($d.mac)$infoExtra" -ForegroundColor Gray
+}
+
+# 3. Coletar informacoes de redes do ambiente via WLAN API
 Write-Host "[+] Coletando informacoes de redes do ambiente via WLAN API..." -ForegroundColor Cyan
 $rawNetworks = netsh wlan show networks mode=bssid
 
@@ -44,39 +192,39 @@ $currentRadio = ""
 foreach ($line in ($rawNetworks -split "\`r?\`n")) {
     $line = $line.Trim()
 
-    if ($line -match "^SSID \\d+\\s+:\\s*(.*)$") {
+    if ($line -match "^SSID \\d+\\s*:\\s*(.*)$") {
         $currentSsid = $matches[1].Trim()
         if ([string]::IsNullOrWhiteSpace($currentSsid)) { $currentSsid = "<REDE_OCULTA>" }
     }
-    elseif ($line -match "^Network type\\s+:\\s*(.*)$") {
+    elseif ($line -match "^(Network type|Tipo de rede)\\s*:\\s*(.*)$") {
         # Infrastructure
     }
-    elseif ($line -match "^Authentication\\s+:\\s*(.*)$") {
-        $currentAuth = $matches[1].Trim()
+    elseif ($line -match "^(Authentication|Autentica|Autenticacion).*\\s*:\\s*(.*)$") {
+        $currentAuth = $matches[2].Trim()
     }
-    elseif ($line -match "^Encryption\\s+:\\s*(.*)$") {
-        $currentCipher = $matches[1].Trim()
+    elseif ($line -match "^(Encryption|Criptografia|Codifica|Cifrado).*\\s*:\\s*(.*)$") {
+        $currentCipher = $matches[2].Trim()
     }
-    elseif ($line -match "^BSSID \\d+\\s+:\\s*(.*)$") {
+    elseif ($line -match "^BSSID \\d+\\s*:\\s*(.*)$") {
         $currentBssid = $matches[1].Trim()
     }
-    elseif ($line -match "^Signal\\s+:\\s*(\\d+)%") {
-        $pct = [int]$matches[1]
+    elseif ($line -match "^(Signal|Sinal|Senal).*\\s*:\\s*(\\d+)%") {
+        $pct = [int]$matches[2]
         # Convert % to approx dBm
         $currentSignal = [int](($pct / 2) - 100)
     }
-    elseif ($line -match "^Radio type\\s+:\\s*(.*)$") {
-        $currentRadio = $matches[1].Trim()
+    elseif ($line -match "^(Radio type|Tipo de r.dio).*\\s*:\\s*(.*)$") {
+        $currentRadio = $matches[2].Trim()
     }
-    elseif ($line -match "^Channel\\s+:\\s*(\\d+)") {
-        $currentChannel = [int]$matches[1]
+    elseif ($line -match "^(Channel|Canal)\\s*:\\s*(\\d+)") {
+        $currentChannel = [int]$matches[2]
 
         # Classify encryption & risk
         $encryption = "WPA2-CCMP"
         $vuln = "SECURE"
         $notes = @()
 
-        if ($currentAuth -match "Open" -or $currentCipher -match "None") {
+        if ($currentAuth -match "Open|Aberta" -or $currentCipher -match "None|Nenhuma") {
             $encryption = "OPEN"
             $vuln = "CRITICAL"
             $notes += "Rede aberta sem qualquer criptografia. Trafego vulneravel a interceptacao e MITM."
@@ -91,12 +239,12 @@ foreach ($line in ($rawNetworks -split "\`r?\`n")) {
             $vuln = "HIGH"
             $notes += "Cifra WPA-TKIP vulneravel a ataques Beck-Tews."
         }
-        elseif ($currentAuth -match "WPA3" -or $currentAuth -match "SAE") {
+        elseif ($currentAuth -match "WPA3|SAE") {
             $encryption = "WPA3-SAE"
             $vuln = "SECURE"
             $notes += "Padrao moderno WPA3 ativo."
         }
-        elseif ($currentAuth -match "Enterprise" -or $currentAuth -match "802.1X") {
+        elseif ($currentAuth -match "Enterprise|802.1X") {
             $encryption = "ENTERPRISE"
             $vuln = "SECURE"
             $notes += "Rede corporativa com autenticacao 802.1X/RADIUS."
@@ -119,10 +267,31 @@ foreach ($line in ($rawNetworks -split "\`r?\`n")) {
     }
 }
 
+$connectedNetObj = $null
+if (-not [string]::IsNullOrWhiteSpace($connSsid)) {
+    $connectedNetObj = [PSCustomObject]@{
+        ssid = $connSsid
+        bssid = $connBssid
+        signalStrength = $connSignal
+        channel = $connChannel
+        radioType = $connRadio
+        authType = $connAuth
+        cipher = $connCipher
+        rxRateMbps = $connRx
+        txRateMbps = $connTx
+    }
+}
+
 $outputObj = [PSCustomObject]@{
     clientCompany = "${company}"
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    interfaceUsed = "Wi-Fi (Windows Native WLAN API)"
+    primarySsid = $connSsid
+    interfaceUsed = $cardDescription
+    adapterMac = $adapterMac
+    connectedNetwork = $connectedNetObj
+    connectedDevices = $devices
+    apIsolationTested = [bool](-not [string]::IsNullOrWhiteSpace($connSsid))
+    apIsolationEffective = $apIsolationEffective
     captureDurationSeconds = 10
     accessPoints = $aps
 }
@@ -134,16 +303,31 @@ Write-Host "[+] Diagnostico concluido com sucesso! ($($aps.Count) pontos de aces
 Write-Host "[+] Arquivo 'devesec-wifi-result.json' salvo localmente." -ForegroundColor Gray
 
 ${autoSend ? `
-# Envio automatico direto para a plataforma Dev & Sec
-try {
-    Write-Host "[+] Transmitindo telemetria da auditoria para a Dev & Sec Suite..." -ForegroundColor Cyan
-    $headers = @{ "Content-Type" = "application/json" }
-    $res = Invoke-RestMethod -Uri "${serverUrl}/api/wifi-audit" -Method Post -Body $jsonOutput -Headers $headers -TimeoutSec 10
-    Write-Host "[OK] Laudo enviado com sucesso para a plataforma!" -ForegroundColor Green
-    Write-Host "[OK] Score Wi-Fi Calculado: $($res.wifiScore)/100 (Nota $($res.wifiGrade))" -ForegroundColor Yellow
-} catch {
-    Write-Host "[!] Envio automatico falhou: $($_.Exception.Message)" -ForegroundColor Yellow
-    Write-Host "[!] Faca o upload manual de 'devesec-wifi-result.json' no painel." -ForegroundColor Gray
+# Envio automatico direto para a plataforma Dev & Sec com fallback
+Write-Host "[+] Transmitindo telemetria da auditoria para a Dev & Sec Suite..." -ForegroundColor Cyan
+$headers = @{ "Content-Type" = "application/json" }
+$targetEndpoints = @(
+    "${serverUrl}/api/wifi-audit",
+    "http://localhost:3000/api/wifi-audit",
+    "http://localhost:3001/api/wifi-audit"
+) | Select-Object -Unique
+
+$sent = $false
+foreach ($endpoint in $targetEndpoints) {
+    try {
+        $res = Invoke-RestMethod -Uri $endpoint -Method Post -Body $jsonOutput -Headers $headers -TimeoutSec 5
+        Write-Host "[OK] Laudo transmitido com sucesso para a plataforma ($endpoint)!" -ForegroundColor Green
+        Write-Host "[OK] Score Wi-Fi Calculado: $($res.wifiScore)/100 (Nota $($res.wifiGrade))" -ForegroundColor Yellow
+        $sent = $true
+        break
+    } catch {
+        # tentar proximo endpoint
+    }
+}
+
+if (-not $sent) {
+    Write-Host "[!] Envio automatico falhou: Verifique se o servidor Dev & Sec esta em execucao." -ForegroundColor Yellow
+    Write-Host "[!] Faca o upload manual do arquivo 'devesec-wifi-result.json' no painel." -ForegroundColor Gray
 }
 ` : ''}
 `;
