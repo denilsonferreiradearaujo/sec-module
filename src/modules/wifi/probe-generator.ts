@@ -137,6 +137,7 @@ if ($localHostIp -match "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\.\\d{1,3}$") {
             try { [System.Threading.Tasks.Task]::WaitAll($pingTasks.ToArray()) } catch {}
         }
         $udpWake.Close()
+        Start-Sleep -Milliseconds 800
     } catch {}
 }
 

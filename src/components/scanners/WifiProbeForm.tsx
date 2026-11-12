@@ -77,10 +77,22 @@ export default function WifiProbeForm() {
       });
   }, []);
 
-  // Real-time Live Telemetry Polling (every 2 seconds when waiting for script execution)
-  useEffect(() => {
-    if (report) return; // don't poll while viewing a report
+  const handleReloadLatest = async () => {
+    try {
+      const res = await fetch('/api/wifi-audit?action=latest');
+      if (res.ok) {
+        const latest: WifiAuditReport | null = await res.json();
+        if (latest) {
+          lastKnownReportIdRef.current = latest.id;
+          setReport(latest);
+          loadHistory();
+        }
+      }
+    } catch {}
+  };
 
+  // Real-time Live Telemetry Polling (every 2.5s)
+  useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const res = await fetch('/api/wifi-audit?action=latest');
@@ -95,8 +107,8 @@ export default function WifiProbeForm() {
           return;
         }
 
-        // If a NEW report arrived that is different from what we previously knew:
-        if (lastKnownReportIdRef.current && latest.id !== lastKnownReportIdRef.current) {
+        // Se chegou um relatório mais recente do que o que está sendo exibido:
+        if (latest.id !== report?.id && latest.id !== lastKnownReportIdRef.current) {
           lastKnownReportIdRef.current = latest.id;
           setReport(latest);
           loadHistory();
@@ -104,10 +116,10 @@ export default function WifiProbeForm() {
       } catch {
         // network silent
       }
-    }, 2000);
+    }, 2500);
 
     return () => clearInterval(interval);
-  }, [report]);
+  }, [report?.id]);
 
   const handleBackToScan = () => {
     if (report?.id) {
@@ -488,6 +500,14 @@ export default function WifiProbeForm() {
                 className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono transition-all"
               >
                 ← Voltar / Novo Scan
+              </button>
+              <button
+                onClick={handleReloadLatest}
+                className="px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-800 hover:border-cyan-500/40 text-xs font-mono flex items-center gap-1.5 transition-all"
+                title="Recarregar diagnóstico mais recente"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Atualizar Dados</span>
               </button>
               <button
                 onClick={() => window.print()}
