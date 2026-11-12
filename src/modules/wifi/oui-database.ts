@@ -249,7 +249,28 @@ const OUI_MAP: Record<string, string> = {
   '70:2e:22': 'Technicolor / Vantiva',
   'a4:52:6f': 'ZTE Corporation',
   '00:1f:a4': 'ZTE Corporation',
+
+  // Prefixos adicionais comuns no Brasil (Samsung, Intel, Realtek, AzureWave)
+  'c8:a6:ef': 'Samsung Electronics',
+  '5c:b2:6d': 'Intel Corporate',
+  '00:e0:4c': 'Realtek Semiconductor',
+  '80:fa:5b': 'CLEVO / Notebook OEM',
+  '74:d4:35': 'Giga-Byte Technology',
 };
+
+const OUI_RUNTIME_CACHE = new Map<string, string>();
+
+/**
+ * Verifica pelo bit U/L (Universal/Local) do padrão IEEE 802.3 se o endereço MAC é
+ * localmente administrado (MAC Privado / Randomizado usado por iOS, Android e Windows 11).
+ */
+export function isRandomizedMac(mac?: string): boolean {
+  if (!mac) return false;
+  const cleanMac = mac.replace(/[:-]/g, '').toLowerCase();
+  if (cleanMac.length < 2) return false;
+  const secondChar = cleanMac[1];
+  return secondChar === '2' || secondChar === '6' || secondChar === 'a' || secondChar === 'e';
+}
 
 export function resolveMacVendor(mac?: string): string {
   if (!mac) return 'Fabricante Desconhecido';
@@ -257,5 +278,44 @@ export function resolveMacVendor(mac?: string): string {
   if (cleanMac.length < 6) return 'Fabricante Desconhecido';
 
   const prefix = `${cleanMac.slice(0, 2)}:${cleanMac.slice(2, 4)}:${cleanMac.slice(4, 6)}`;
-  return OUI_MAP[prefix] || 'Dispositivo de Rede Genérico';
+  if (OUI_MAP[prefix]) return OUI_MAP[prefix];
+  if (isRandomizedMac(mac)) return 'MAC Privado / Randomizado (Smartphone/Tablet/Win11)';
+  return 'Dispositivo de Rede Genérico';
 }
+
+export async function resolveMacVendorAsync(mac?: string): Promise<string> {
+  if (!mac) return 'Fabricante Desconhecido';
+  const cleanMac = mac.replace(/[:-]/g, '').toLowerCase();
+  if (cleanMac.length < 6) return 'Fabricante Desconhecido';
+
+  const prefix = `${cleanMac.slice(0, 2)}:${cleanMac.slice(2, 4)}:${cleanMac.slice(4, 6)}`;
+  if (OUI_MAP[prefix]) return OUI_MAP[prefix];
+  if (isRandomizedMac(mac)) return 'MAC Privado / Randomizado (Smartphone/Tablet/Win11)';
+
+  const cached = OUI_RUNTIME_CACHE.get(prefix);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`https://api.maclookup.app/v2/macs/${prefix}`, {
+      signal: AbortSignal.timeout(1500),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.isRand) {
+        const label = 'MAC Privado / Randomizado (Smartphone/Tablet/Win11)';
+        OUI_RUNTIME_CACHE.set(prefix, label);
+        return label;
+      }
+      if (data?.found && data?.company) {
+        const cleanCompany = String(data.company).replace(/,?\s*(Co\.|Inc\.|Ltd\.|Corp\.|S\.A\.|LTDA).*$/i, '').trim() || String(data.company);
+        OUI_RUNTIME_CACHE.set(prefix, cleanCompany);
+        return cleanCompany;
+      }
+    }
+  } catch {
+    // fallback silencioso
+  }
+
+  return 'Dispositivo de Rede Genérico';
+}
+

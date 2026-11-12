@@ -1,6 +1,6 @@
 import { AccessPointAudit, WifiAuditReport, ConnectedDevice, DeviceCategory } from '@/core/types/wifi';
 import { ChecklistItem } from '@/core/types/security';
-import { resolveMacVendor } from './oui-database';
+import { resolveMacVendor, resolveMacVendorAsync } from './oui-database';
 
 function classifyCategory(
   vendor: string,
@@ -27,18 +27,7 @@ function classifyCategory(
   }
 
   if (
-    lowerVendor.includes('apple') ||
-    lowerVendor.includes('samsung') ||
-    lowerVendor.includes('xiaomi') ||
-    lowerVendor.includes('motorola')
-  ) {
-    if (lowerHost.includes('macbook') || lowerHost.includes('imac') || lowerHost.includes('mac-')) {
-      return 'WORKSTATION';
-    }
-    return 'MOBILE';
-  }
-
-  if (
+    openPorts.includes(9100) ||
     lowerVendor.includes('epson') ||
     lowerVendor.includes('canon') ||
     lowerVendor.includes('brother') ||
@@ -60,21 +49,64 @@ function classifyCategory(
   }
 
   if (
+    openPorts.includes(135) ||
+    openPorts.includes(445) ||
+    openPorts.includes(3389) ||
     lowerVendor.includes('dell') ||
     lowerVendor.includes('intel') ||
     lowerVendor.includes('lenovo') ||
     lowerVendor.includes('hp') ||
+    lowerVendor.includes('clevo') ||
+    lowerVendor.includes('giga-byte') ||
     lowerHost.includes('desktop') ||
     lowerHost.includes('laptop') ||
     lowerHost.includes('notebook') ||
     lowerHost.includes('pc') ||
-    openPorts.includes(445) ||
-    openPorts.includes(3389)
+    lowerHost.includes('macbook') ||
+    lowerHost.includes('imac')
   ) {
     return 'WORKSTATION';
   }
 
+  if (
+    openPorts.includes(62078) ||
+    lowerVendor.includes('apple') ||
+    lowerVendor.includes('samsung') ||
+    lowerVendor.includes('xiaomi') ||
+    lowerVendor.includes('motorola') ||
+    lowerVendor.includes('mac privado') ||
+    lowerHost.includes('iphone') ||
+    lowerHost.includes('ipad') ||
+    lowerHost.includes('galaxy') ||
+    lowerHost.includes('android')
+  ) {
+    return 'MOBILE';
+  }
+
   return 'OTHER';
+}
+
+export async function enrichWifiAuditReportAsync(report: WifiAuditReport): Promise<WifiAuditReport> {
+  if (!report.connectedDevices || report.connectedDevices.length === 0) return report;
+
+  const updatedDevices = await Promise.all(
+    report.connectedDevices.map(async (dev) => {
+      let vendor = dev.vendor;
+      if (!vendor || vendor === 'Dispositivo de Rede Genérico' || vendor === 'Fabricante Desconhecido') {
+        vendor = await resolveMacVendorAsync(dev.mac);
+      }
+      const category =
+        dev.category && dev.category !== 'OTHER'
+          ? dev.category
+          : classifyCategory(vendor || '', dev.hostname, dev.type, dev.openPorts || []);
+      return { ...dev, vendor, category };
+    })
+  );
+
+  return {
+    ...report,
+    connectedDevices: updatedDevices,
+  };
 }
 
 export function parseWifiProbeResult(rawJson: unknown): WifiAuditReport {
@@ -109,7 +141,11 @@ export function parseWifiProbeResult(rawJson: unknown): WifiAuditReport {
     const hostname = d.hostname ? String(d.hostname) : undefined;
     const type = (d.type as 'GATEWAY' | 'DEVICE' | 'BROADCAST' | 'MULTICAST') || 'DEVICE';
     const openPorts = Array.isArray(d.openPorts) ? (d.openPorts as number[]) : [];
-    const category = (d.category as DeviceCategory) || classifyCategory(vendor, hostname, type, openPorts);
+    const providedCategory = d.category as DeviceCategory | undefined;
+    const category =
+      providedCategory && providedCategory !== 'OTHER'
+        ? providedCategory
+        : classifyCategory(vendor, hostname, type, openPorts);
 
     return {
       ip: String(d.ip || ''),

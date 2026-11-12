@@ -85,17 +85,19 @@ if (-not [string]::IsNullOrWhiteSpace($connSsid)) {
     Write-Host "[+] Conectado a rede: $connSsid (BSSID: $connBssid | Canal: $connChannel | Sinal: $connSignal%)" -ForegroundColor Cyan
 }
 
-# 2. Descobrir aparelhos conectados na rede local (Hostnames, Portas, Gateway)
+# 2. Descobrir aparelhos conectados na rede local (Varredura Ativa Sub-rede + ARP + Hostnames + Portas)
 Write-Host "[+] Mapeando aparelhos conectados na sub-rede local..." -ForegroundColor Cyan
 $devices = @()
 $seenIps = @{}
 
-# Descobrir IP local do host na interface ativa da rota padrao (Wi-Fi)
+# Descobrir IP local e interface ativa da rota padrao (Wi-Fi)
 $localHostIp = ""
+$activeIfIndex = $null
 try {
-    $defRoute = Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Select-Object -First 1
+    $defRoute = Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -First 1
     if ($defRoute) {
-        $localHostIp = (Get-NetIPAddress -InterfaceIndex $defRoute.InterfaceIndex -AddressFamily IPv4 | Select-Object -First 1).IPAddress
+        $activeIfIndex = $defRoute.InterfaceIndex
+        $localHostIp = (Get-NetIPAddress -InterfaceIndex $activeIfIndex -AddressFamily IPv4 | Select-Object -First 1).IPAddress
     }
 } catch {}
 
@@ -113,54 +115,131 @@ if ($localHostIp -and -not [string]::IsNullOrWhiteSpace($adapterMac)) {
     }
 }
 
-# Descobrir vizinhos via ARP e resolver hostnames / portas
+# 2A. Varredura Ativa dupla na sub-rede /24 para acordar celulares/tablets/notebooks em modo sleep e popular ARP
+$subnetPrefix = ""
+if ($localHostIp -match "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\.\\d{1,3}$") {
+    $subnetPrefix = $matches[1]
+    Write-Host "[+] Executando varredura ativa em $subnetPrefix.1-254 (ARP + ICMP + UDP Wake-up)..." -ForegroundColor Cyan
+    try {
+        $udpWake = New-Object System.Net.Sockets.UdpClient
+        $wakeBytes = [byte[]](0x00, 0x00, 0x00, 0x00)
+        for ($pass = 1; $pass -le 2; $pass++) {
+            $pingTasks = New-Object System.Collections.Generic.List[System.Threading.Tasks.Task]
+            $udpPort = if ($pass -eq 1) { 137 } else { 5353 }
+            for ($i = 1; $i -le 254; $i++) {
+                $targetIp = "$subnetPrefix.$i"
+                if ($targetIp -eq $localHostIp) { continue }
+                try { $null = $udpWake.Send($wakeBytes, $wakeBytes.Length, $targetIp, $udpPort) } catch {}
+                $p = New-Object System.Net.NetworkInformation.Ping
+                $pingTasks.Add($p.SendPingAsync($targetIp, 900))
+            }
+            try { $null = $udpWake.Send($wakeBytes, $wakeBytes.Length, "224.0.0.251", 5353) } catch {}
+            try { [System.Threading.Tasks.Task]::WaitAll($pingTasks.ToArray()) } catch {}
+        }
+        $udpWake.Close()
+    } catch {}
+}
+
+# 2B. Coletar tabela ARP/Neighbor atualizada (preferindo Get-NetNeighbor por interface)
+$neighborMap = @{}
+try {
+    if ($activeIfIndex) {
+        $netNeighbors = Get-NetNeighbor -InterfaceIndex $activeIfIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.LinkLayerAddress -and
+                $_.LinkLayerAddress -notmatch "^(00-00-00-00-00-00|ff-ff-ff-ff-ff-ff)$" -and
+                $_.State -ne "Unreachable" -and
+                $_.State -ne "Incomplete"
+            }
+        foreach ($nn in $netNeighbors) {
+            $ip = $nn.IPAddress
+            $mac = $nn.LinkLayerAddress.Replace("-", ":").ToLower()
+            if ($ip -notmatch "^(224\\.|239\\.|255\\.)" -and $ip -notmatch "\\.255$" -and -not $seenIps.ContainsKey($ip)) {
+                $neighborMap[$ip] = $mac
+            }
+        }
+    }
+} catch {}
+
+# Fallback / complemento via arp -a (filtrado na sub-rede quando conhecida)
 $rawArp = arp -a
 foreach ($line in ($rawArp -split "\`r?\`n")) {
     $t = $line.Trim()
     if ($t -match "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\s+([0-9a-fA-F\\-]{17})\\s+(\\S+)") {
         $ip = $matches[1]
         $mac = $matches[2].Replace("-", ":").ToLower()
-        if ($ip -notmatch "^(224\\.|239\\.|255\\.)" -and $ip -notmatch "\\.255$" -and -not $seenIps.ContainsKey($ip)) {
-            $seenIps[$ip] = $true
-            $devType = "DEVICE"
-            $cat = "OTHER"
-            if ($ip -match "\\.1$" -or ($connBssid -and $mac.StartsWith($connBssid.Substring(0, 8).ToLower()))) {
-                $devType = "GATEWAY"
-                $cat = "GATEWAY"
-            }
-
-            # Resolução de Hostname via DNS reverso
-            $hostName = ""
-            try {
-                $dnsEntry = [System.Net.Dns]::GetHostEntry($ip)
-                if ($dnsEntry -and $dnsEntry.HostName) { $hostName = $dnsEntry.HostName }
-            } catch {}
-
-            # Checagem não-invasiva de portas de gerenciamento (80, 443, 445, 22, 3389)
-            $openPorts = @()
-            $portsToCheck = @(80, 443, 445, 22, 3389)
-            foreach ($p in $portsToCheck) {
-                try {
-                    $tcp = New-Object System.Net.Sockets.TcpClient
-                    $ar = $tcp.BeginConnect($ip, $p, $null, $null)
-                    $wait = $ar.AsyncWaitHandle.WaitOne(120, $false)
-                    if ($wait -and $tcp.Connected) {
-                        $openPorts += $p
-                    }
-                    $tcp.Close()
-                } catch {}
-            }
-
-            $devices += [PSCustomObject]@{
-                ip = $ip
-                mac = $mac
-                type = $devType
-                hostname = $hostName
-                category = $cat
-                openPorts = $openPorts
-                isApIsolationVulnerable = ($devType -ne "GATEWAY")
+        if ($ip -notmatch "^(224\\.|239\\.|255\\.)" -and $ip -notmatch "\\.255$" -and $mac -ne "ff:ff:ff:ff:ff:ff" -and $mac -ne "00:00:00:00:00:00" -and -not $seenIps.ContainsKey($ip)) {
+            if ([string]::IsNullOrWhiteSpace($subnetPrefix) -or $ip.StartsWith("$subnetPrefix.")) {
+                if (-not $neighborMap.ContainsKey($ip)) {
+                    $neighborMap[$ip] = $mac
+                }
             }
         }
+    }
+}
+
+# Ordenar IPs descobertos e resolver hostnames em paralelo
+$sortedIps = $neighborMap.Keys | Sort-Object { [int](($_ -split "\\.")[-1]) }
+$dnsTasks = @{}
+foreach ($ip in $sortedIps) {
+    try { $dnsTasks[$ip] = [System.Net.Dns]::GetHostEntryAsync($ip) } catch {}
+}
+if ($dnsTasks.Count -gt 0) {
+    try {
+        [System.Threading.Tasks.Task[]]$dnsArr = @($dnsTasks.Values)
+        $allDns = [System.Threading.Tasks.Task]::WhenAll($dnsArr)
+        $null = $allDns.Wait(2500)
+    } catch {}
+}
+
+$portsToCheck = @(80, 443, 445, 135, 22, 3389, 62078, 9100)
+
+foreach ($ip in $sortedIps) {
+    $seenIps[$ip] = $true
+    $mac = $neighborMap[$ip]
+    $devType = "DEVICE"
+    $cat = ""
+    if ($ip -match "\\.1$" -or ($connBssid -and $mac.StartsWith($connBssid.Substring(0, 8).ToLower()))) {
+        $devType = "GATEWAY"
+        $cat = "GATEWAY"
+    }
+
+    $hostName = ""
+    if ($dnsTasks.ContainsKey($ip) -and $dnsTasks[$ip].IsCompleted -and -not $dnsTasks[$ip].IsFaulted) {
+        try {
+            $resolved = $dnsTasks[$ip].Result.HostName
+            if ($resolved -and $resolved -ne $ip) { $hostName = $resolved }
+        } catch {}
+    }
+
+    # Checagem paralela não-invasiva de portas (HTTP, HTTPS, SMB, RPC, SSH, RDP, Apple Sync, Impressora)
+    $openPorts = @()
+    $portClients = @()
+    foreach ($p in $portsToCheck) {
+        try {
+            $tcp = New-Object System.Net.Sockets.TcpClient
+            $ar = $tcp.BeginConnect($ip, $p, $null, $null)
+            $portClients += [PSCustomObject]@{ Port = $p; Client = $tcp; AsyncResult = $ar }
+        } catch {}
+    }
+    Start-Sleep -Milliseconds 180
+    foreach ($pc in $portClients) {
+        try {
+            if ($pc.AsyncResult.AsyncWaitHandle.WaitOne(30, $false) -and $pc.Client.Connected) {
+                $openPorts += $pc.Port
+            }
+            $pc.Client.Close()
+        } catch {}
+    }
+
+    $devices += [PSCustomObject]@{
+        ip = $ip
+        mac = $mac
+        type = $devType
+        hostname = $hostName
+        category = $cat
+        openPorts = $openPorts
+        isApIsolationVulnerable = ($devType -ne "GATEWAY")
     }
 }
 

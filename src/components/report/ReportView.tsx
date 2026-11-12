@@ -32,6 +32,7 @@ import {
   Building2,
   Cpu,
   Sparkles,
+  Mail,
 } from 'lucide-react';
 import WhiteLabelModal from './WhiteLabelModal';
 
@@ -856,8 +857,123 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
         <div className={`space-y-6 ${activeTab === 'infra' ? 'block' : 'hidden print:block print:mt-8 print-avoid-break'}`}>
           <div className="p-6 rounded-xl bg-surface border border-surface-border space-y-6">
             <h3 className="text-sm font-bold uppercase font-mono tracking-wider text-cyan-400 pb-2 border-b border-surface-border">
-              3. Infraestrutura, Superfície de Rede e Portas Abertas
+              3. Infraestrutura, Borda WAF, Segurança de E-mail & Portas Abertas
             </h3>
+
+            {/* WAF & Edge Shield Card */}
+            {report.infraRecon.wafDetection && (
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className={`w-4 h-4 ${report.infraRecon.wafDetection.detected ? 'text-emerald-400' : 'text-amber-400'}`} />
+                    <span className="text-xs font-mono uppercase font-bold text-white">Proteção de Borda & Firewall WAF:</span>
+                  </div>
+                  {report.infraRecon.wafDetection.detected ? (
+                    <span className="px-2.5 py-0.5 rounded text-[11px] font-bold font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                      {report.infraRecon.wafDetection.wafName || 'WAF DETECTADO'}
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded text-[11px] font-bold font-mono bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                      NENHUM WAF IDENTIFICADO (EXPOSTO)
+                    </span>
+                  )}
+                </div>
+
+                {report.infraRecon.wafDetection.originIpLeakDetected && (
+                  <div className="p-3 rounded-lg bg-rose-500/15 border border-rose-500/50 space-y-1">
+                    <div className="flex items-center gap-2 text-rose-400 font-mono font-bold text-xs">
+                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      ALERTA CRÍTICO: ORIGIN IP LEAK (VAZAMENTO DO SERVIDOR REAL)
+                    </div>
+                    <p className="text-xs text-slate-300">
+                      {report.infraRecon.wafDetection.originIpReason}
+                    </p>
+                    <div className="text-[11px] font-mono text-rose-300">
+                      IP de Origem Suspeito: <span className="font-bold underline">{report.infraRecon.wafDetection.suspectedOriginIp}</span> (Atacantes podem contornar o WAF conectando diretamente a este IP).
+                    </div>
+                  </div>
+                )}
+
+                {report.infraRecon.wafDetection.evidence && report.infraRecon.wafDetection.evidence.length > 0 && (
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    <span className="text-slate-500">Evidências: </span>
+                    {report.infraRecon.wafDetection.evidence.join(' | ')}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Email Security & Anti-Spoofing (SPF / DMARC) */}
+            {report.infraRecon.emailSecurity && (
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-mono uppercase font-bold text-white">Postura de Segurança de E-mail (Anti-Spoofing):</span>
+                  </div>
+                  {report.infraRecon.emailSecurity.spoofingVulnerable ? (
+                    <span className="px-2.5 py-0.5 rounded text-[11px] font-bold font-mono bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                      VULNERÁVEL A EMAIL SPOOFING
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded text-[11px] font-bold font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                      ANTI-SPOOFING PROTEGIDO
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                  <div className="p-3 rounded bg-slate-900 border border-slate-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Política DMARC (RFC 7489):</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        report.infraRecon.emailSecurity.dmarcPolicy === 'reject'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                          : report.infraRecon.emailSecurity.dmarcPolicy === 'quarantine'
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                      }`}>
+                        p={report.infraRecon.emailSecurity.dmarcPolicy}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      {report.infraRecon.emailSecurity.dmarcPolicy === 'reject'
+                        ? 'Excelente: E-mails falsificados são bloqueados e rejeitados.'
+                        : report.infraRecon.emailSecurity.dmarcPolicy === 'quarantine'
+                        ? 'Moderado: E-mails falsificados vão para a caixa de spam.'
+                        : 'Fraco: Nenhuma proteção ativa contra envio de e-mails em nome da empresa.'}
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded bg-slate-900 border border-slate-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Validação SPF (RFC 7208):</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        report.infraRecon.emailSecurity.spfMechanism === '-all'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                          : report.infraRecon.emailSecurity.spfMechanism === '~all'
+                          ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
+                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                      }`}>
+                        {report.infraRecon.emailSecurity.spfMechanism || 'Nenhum'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      {report.infraRecon.emailSecurity.spfMechanism === '-all'
+                        ? 'Hardfail: Somente IPs autorizados podem disparar e-mails.'
+                        : report.infraRecon.emailSecurity.spfMechanism === '~all'
+                        ? 'Softfail: Servidores não autorizados são marcados como suspeitos.'
+                        : 'Neutro ou Ausente: Qualquer invasor pode enviar e-mails usando o domínio.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-xs text-slate-300">
+                  <span className="text-slate-500 font-mono">Diagnóstico: </span>
+                  {report.infraRecon.emailSecurity.summary}
+                </div>
+              </div>
+            )}
 
             {/* Geolocation Card */}
             {report.infraRecon.geolocation && (
@@ -913,8 +1029,36 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
               </div>
             </div>
 
-            {/* Subdomains */}
-            {report.infraRecon.subdomains.length > 0 && (
+            {/* Subdomains with Detail or List */}
+            {report.infraRecon.subdomainList && report.infraRecon.subdomainList.length > 0 ? (
+              <div className="space-y-2 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase font-bold text-slate-300">
+                    Subdomínios Descobertos ({report.infraRecon.subdomainList.length}):
+                  </span>
+                  <span className="text-[10px] font-mono text-cyan-400">DNS Ativo & Transparência SSL</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {report.infraRecon.subdomainList.map((sub, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs font-mono"
+                    >
+                      <div className="truncate mr-2">
+                        <span className="text-cyan-300 font-semibold truncate block">{sub.subdomain}</span>
+                        {sub.ip && <span className="text-[10px] text-slate-500">{sub.ip}</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`w-2 h-2 rounded-full ${sub.isAlive ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                        <span className="text-[10px] text-slate-400">
+                          {sub.source === 'DNS_BRUTEFORCE' ? 'DNS' : 'SSL'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : report.infraRecon.subdomains.length > 0 ? (
               <div className="space-y-2 pt-4 border-t border-slate-800">
                 <span className="text-xs font-mono uppercase font-bold text-slate-300">
                   Subdomínios Públicos Identificados (Certificate Transparency):
@@ -927,7 +1071,7 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}
@@ -966,16 +1110,34 @@ export default function ReportView({ report, onNewScan }: ReportViewProps) {
                 <span className="text-xl font-bold font-mono text-rose-400">
                   {report.threatIntel.virusTotal?.maliciousVotes || 0} / {report.threatIntel.virusTotal?.totalEngines || 93} motores de segurança
                 </span>
+                {report.threatIntel.virusTotal?.analyzed && (
+                  <span className="text-[11px] text-slate-500 block mt-0.5 font-mono">
+                    ({report.threatIntel.virusTotal?.harmlessVotes || 0} confirmaram limpo / {report.threatIntel.virusTotal?.suspiciousVotes || 0} suspeitos)
+                  </span>
+                )}
               </div>
-              {(report.threatIntel.virusTotal?.maliciousVotes || 0) > 0 ? (
-                <span className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-rose-500/20 text-rose-400 border border-rose-500/40">
-                  SINALIZADO COMO AMEAÇA
-                </span>
-              ) : (
-                <span className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                  REPUTAÇÃO POSITIVA
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                {(report.threatIntel.virusTotal?.maliciousVotes || 0) > 0 ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                    SINALIZADO COMO AMEAÇA
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                    REPUTAÇÃO POSITIVA
+                  </span>
+                )}
+                {report.threatIntel.virusTotal?.permalink && (
+                  <a
+                    href={report.threatIntel.virusTotal.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded text-xs font-mono bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-700/50 transition-colors flex items-center gap-1 shadow-sm"
+                    title="Ver análise completa no VirusTotal"
+                  >
+                    VirusTotal ↗
+                  </a>
+                )}
+              </div>
             </div>
 
             {/* Blacklists */}

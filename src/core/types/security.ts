@@ -82,7 +82,43 @@ export interface InfraReconData {
     riskLevel: SeverityLevel;
   }>;
   subdomains: string[];
+  subdomainList?: SubdomainItem[];
+  wafDetection?: WafDetectionData;
+  emailSecurity?: EmailSecurityData;
   moduleScore: number;
+}
+
+export interface SubdomainItem {
+  subdomain: string;
+  ip?: string;
+  isAlive: boolean;
+  source: 'DNS_BRUTEFORCE' | 'CERT_TRANSPARENCY' | 'MX_RECORDS';
+  statusCode?: number;
+  title?: string;
+  isCdnOrWaf?: boolean;
+}
+
+export interface WafDetectionData {
+  detected: boolean;
+  wafName?: string;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  evidence: string[];
+  originIpLeakDetected: boolean;
+  suspectedOriginIp?: string;
+  originIpReason?: string;
+}
+
+export interface EmailSecurityData {
+  spfStatus: 'SECURE' | 'WARNING' | 'CRITICAL';
+  dmarcStatus: 'SECURE' | 'WARNING' | 'CRITICAL';
+  spoofingVulnerable: boolean;
+  effectiveDmarcPolicy: string;
+  dmarcPolicy?: string;
+  spfMechanism?: string;
+  spfRecord?: string;
+  dmarcRecord?: string;
+  summary: string;
+  recommendation?: string;
 }
 
 export interface ThreatIntelData {
@@ -256,6 +292,9 @@ export interface UnifiedAuditReport {
   mobileAudit?: MobileAuditData;
   cveData?: CveData;
   secretsAudit?: SecretAuditData;
+  subdomainList?: SubdomainItem[];
+  wafDetection?: WafDetectionData;
+  emailSecurity?: EmailSecurityData;
   kaliArsenal?: import('./kali-tools').KaliScanAggregation;
   whiteLabel?: WhiteLabelConfig;
   commercialPitch: {

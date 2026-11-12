@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseWifiProbeResult } from '@/modules/wifi/parser';
+import { parseWifiProbeResult, enrichWifiAuditReportAsync } from '@/modules/wifi/parser';
 import { generateWifiProbeBashScript, generateWifiProbePowerShellScript } from '@/modules/wifi/probe-generator';
 import {
   saveWifiAuditReport,
@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const report = parseWifiProbeResult(body);
+    const parsedReport = parseWifiProbeResult(body);
+    const report = await enrichWifiAuditReportAsync(parsedReport);
 
     // Save telemetry to data/wifi/ indexed by SSID
     await saveWifiAuditReport(report);

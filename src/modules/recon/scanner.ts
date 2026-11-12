@@ -1,6 +1,9 @@
 import { InfraReconData, SecurityFinding, SeverityLevel } from '@/core/types/security';
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import { enumerateSubdomains } from './subdomains';
+import { detectWafAndOriginLeak } from './waf';
+import { auditEmailSecurity } from './email-security';
 
 // Common sensitive ports to inspect
 const COMMON_PORTS = [
@@ -359,26 +362,68 @@ export async function scanInfraRecon(target: string): Promise<{ data: InfraRecon
       }
     }
 
-    // 4. Subdomain Discovery (Certificate Transparency Logs crt.sh)
+    // 4. Subdomain Discovery (Active DNS Bruteforce + crt.sh CT Logs)
     try {
-      const crtRes = await fetch(`https://crt.sh/?q=%25.${host}&output=json`, {
-        signal: AbortSignal.timeout(4000),
-      });
-      if (crtRes.ok) {
-        const crtJson: Array<{ name_value: string }> = await crtRes.json();
-        const set = new Set<string>();
-        for (const item of crtJson.slice(0, 30)) {
-          const names = item.name_value.split('\n');
-          for (const n of names) {
-            if (n.endsWith(host) && !n.includes('*')) {
-              set.add(n.toLowerCase());
-            }
-          }
+      const subdomains = await enumerateSubdomains(host);
+      reconData.subdomainList = subdomains;
+      reconData.subdomains = subdomains.map((s) => s.subdomain);
+    } catch {
+      reconData.subdomainList = [];
+      reconData.subdomains = [];
+    }
+
+    // 5. WAF Detection & Origin IP Leak Analysis
+    try {
+      const headersMap: Record<string, string> = {};
+      try {
+        const headRes = await fetch(`https://${host}`, {
+          method: 'HEAD',
+          signal: AbortSignal.timeout(2500),
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) DevSecSuite/2.0' },
+        }).catch(() => null);
+        if (headRes) {
+          headRes.headers.forEach((val, key) => {
+            headersMap[key.toLowerCase()] = val;
+          });
         }
-        reconData.subdomains = Array.from(set).slice(0, 15);
+      } catch {
+        // ignore
+      }
+
+      reconData.wafDetection = detectWafAndOriginLeak(headersMap, reconData.resolvedIps, reconData.subdomainList || []);
+      if (reconData.wafDetection.originIpLeakDetected) {
+        findings.push({
+          id: 'WAF-ORIGIN-IP-LEAK',
+          title: 'Vazamento de IP de Origem (Bypass de WAF)',
+          description: reconData.wafDetection.originIpReason || 'Subdomínio expõe IP real fora da proteção do WAF.',
+          severity: 'HIGH',
+          remediation: 'Mova todos os subdomínios expostos para trás do proxy WAF ou bloqueie conexões diretas na porta 80/443 do servidor.',
+          category: 'INFRASTRUCTURE',
+          cveOrStandard: 'CWE-693',
+        });
+        reconData.moduleScore -= 20;
       }
     } catch {
-      // Subdomain log lookup failed or timed out
+      // ignore
+    }
+
+    // 6. Email Security & Anti-Spoofing Posture (SPF / DMARC)
+    try {
+      reconData.emailSecurity = auditEmailSecurity(host, reconData.dns.spf, reconData.dns.dmarc);
+      if (reconData.emailSecurity.spoofingVulnerable) {
+        findings.push({
+          id: 'EMAIL-SPOOFING-RISK',
+          title: 'Domínio Vulnerável a Falsificação de E-mails (Email Spoofing)',
+          description: reconData.emailSecurity.summary,
+          severity: 'HIGH',
+          remediation: reconData.emailSecurity.recommendation || 'Implemente política DMARC p=reject ou p=quarantine e SPF -all.',
+          category: 'INFRASTRUCTURE',
+          cveOrStandard: 'RFC 7489 / RFC 7208',
+        });
+        reconData.moduleScore -= 15;
+      }
+    } catch {
+      // ignore
     }
 
     reconData.moduleScore = Math.max(0, reconData.moduleScore);

@@ -34,6 +34,45 @@ const SAMPLE_VULNERABLE_CONFIG = [
   ''
 ].join('\n');
 
+const SAMPLE_API_VULNERABILITIES = [
+  '// Exemplo de Controller Express / Node.js com Falhas OWASP API Top 10',
+  'const express = require("express");',
+  'const axios = require("axios");',
+  'const jwt = require("jsonwebtoken");',
+  'const app = express();',
+  '',
+  '// 1. OWASP API8:2023 - Security Misconfiguration (CORS Permissivo)',
+  'app.use((req, res, next) => {',
+  '  res.setHeader("Access-Control-Allow-Origin", "*");',
+  '  next();',
+  '});',
+  '',
+  '// 2. OWASP API1:2023 - Broken Object Level Authorization (BOLA)',
+  'app.get("/api/v1/orders/:id", async (req, res) => {',
+  '  // Falha: Busca pedido diretamente por ID sem validar se pertence ao usuário logado',
+  '  const order = await db.Order.findById(req.params.id);',
+  '  res.json(order);',
+  '});',
+  '',
+  '// 3. OWASP API3:2023 - Broken Object Property (Mass Assignment)',
+  'app.put("/api/v1/users/profile", async (req, res) => {',
+  '  // Falha: Passa req.body diretamente sem filtrar roles ou privilégios de admin',
+  '  const updated = await User.update(req.body);',
+  '  res.json(updated);',
+  '});',
+  '',
+  '// 4. OWASP API7:2023 - Server Side Request Forgery (SSRF)',
+  'app.post("/api/v1/fetch-avatar", async (req, res) => {',
+  '  // Falha: Faz download de URL fornecida pelo usuário sem validar IP de rede interna',
+  '  const response = await axios.get(req.body.avatarUrl);',
+  '  res.send(response.data);',
+  '});',
+  '',
+  '// 5. OWASP API2:2023 - Broken Authentication (Segredo Fraco)',
+  'const token = jwt.sign({ role: "admin" }, "secret");',
+  ''
+].join('\n');
+
 export default function SecretScannerForm({ onScanComplete, isLoading, setIsLoading }: SecretScannerFormProps) {
   const [content, setContent] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
@@ -80,18 +119,24 @@ export default function SecretScannerForm({ onScanComplete, isLoading, setIsLoad
     setError(null);
   };
 
+  const loadApiSample = () => {
+    setContent(SAMPLE_API_VULNERABILITIES);
+    setSourceName('controller-api-rotas.js');
+    setError(null);
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono uppercase tracking-wider mb-2">
           <KeyRound className="w-3.5 h-3.5" />
-          DevSecOps & GitGuardian Intelligence
+          SAST & OWASP API Top 10 Intelligence
         </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-          Auditoria de Vazamento de Segredos
+          Auditoria de Código / SAST & <span className="text-amber-400">Vazamento de Segredos</span>
         </h1>
         <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">
-          Identifique credenciais, tokens de API, chaves privadas e strings de conexão expostas em código, arquivos <code className="text-emerald-400">.env</code> e configurações de nuvem.
+          Identifique credenciais expostas (AWS, GitHub, DBs, Private Keys) e falhas críticas de segurança em APIs (BOLA, Mass Assignment, SSRF, Autenticação Fraca).
         </p>
       </div>
 
@@ -133,14 +178,25 @@ export default function SecretScannerForm({ onScanComplete, isLoading, setIsLoad
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
                 Conteúdo do Arquivo / Trecho de Código
               </label>
-              <button
-                type="button"
-                onClick={loadSample}
-                className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 underline transition-colors"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                Carregar Exemplo com Falhas (Demonstração)
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={loadSample}
+                  className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 underline transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Exemplo .env (Secrets)
+                </button>
+                <span className="text-slate-600 text-xs">•</span>
+                <button
+                  type="button"
+                  onClick={loadApiSample}
+                  className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 underline transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Exemplo API (OWASP Top 10)
+                </button>
+              </div>
             </div>
             <textarea
               rows={9}

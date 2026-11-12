@@ -12,9 +12,15 @@ import {
   Clock,
   Loader2,
   X,
+  DollarSign,
+  Scale,
+  Calculator,
+  TrendingDown,
+  Sparkles,
+  ShieldAlert,
 } from 'lucide-react';
 import { UnifiedAuditReport } from '@/core/types/security';
-import { compareAudits } from '@/core/scoring/comparator';
+import { compareAudits, calculateLgpdAndFairRisk } from '@/core/scoring/comparator';
 import { AuditComparisonResult } from '@/core/types/comparator';
 import { TargetAuditSummary } from '@/core/storage/audit-store';
 
@@ -37,6 +43,17 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [annualRevenue, setAnnualRevenue] = useState<number>(12000000); // R$ 12.000.000,00 default
+
+  const dynamicRisk = comparison
+    ? calculateLgpdAndFairRisk(
+        comparison.baselineReport.criticalCount,
+        comparison.baselineReport.highCount,
+        comparison.latestReport.criticalCount,
+        comparison.latestReport.highCount,
+        annualRevenue
+      )
+    : null;
 
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const isSelectingTargetRef = useRef(false);
@@ -445,6 +462,170 @@ export default function AuditComparatorView({ initialBaseline, initialLatest }: 
               </div>
             )}
           </div>
+
+          {/* SIMULADOR DE MULTAS LGPD / ANPD (Art. 52 Lei 13.709/2018) */}
+          {dynamicRisk && (
+            <div className="p-6 sm:p-8 rounded-2xl bg-surface border border-surface-border space-y-5 print-avoid-break">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-border">
+                <div className="flex items-center gap-2">
+                  <Scale className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-base font-bold text-white">
+                    Simulador de Penalidades & Multas ANPD / LGPD (Art. 52 Lei 13.709/2018)
+                  </h3>
+                </div>
+                <span className="text-xs font-mono text-slate-400">
+                  Teto legal de 2% do faturamento (Máx R$ 50M)
+                </span>
+              </div>
+
+              {/* Revenue Selector */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="text-xs font-mono uppercase font-bold text-slate-300 flex items-center gap-1.5">
+                    <Calculator className="w-4 h-4 text-amber-400" />
+                    Faturamento Anual Bruto da Empresa:
+                  </label>
+                  <span className="text-sm font-bold text-emerald-400 font-mono">
+                    R$ {annualRevenue.toLocaleString('pt-BR')},00
+                  </span>
+                </div>
+
+                {/* Quick Preset Buttons */}
+                <div className="flex items-center gap-2 flex-wrap font-mono text-xs">
+                  <span className="text-slate-500 text-[11px]">Faixas de Porte:</span>
+                  {[
+                    { label: 'R$ 3M (EPP)', val: 3000000 },
+                    { label: 'R$ 12M (Média)', val: 12000000 },
+                    { label: 'R$ 50M (Média-Grande)', val: 50000000 },
+                    { label: 'R$ 120M (Grande Porte)', val: 120000000 },
+                  ].map((p) => (
+                    <button
+                      key={p.val}
+                      type="button"
+                      onClick={() => setAnnualRevenue(p.val)}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        annualRevenue === p.val
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-bold'
+                          : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                <input
+                  type="range"
+                  min={1000000}
+                  max={250000000}
+                  step={1000000}
+                  value={annualRevenue}
+                  onChange={(e) => setAnnualRevenue(Number(e.target.value))}
+                  className="w-full accent-amber-500 cursor-pointer"
+                />
+              </div>
+
+              {/* LGPD Metric Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                  <span className="text-slate-500 block text-[11px] uppercase">Teto Máximo Legal da Sanção (2%)</span>
+                  <span className="text-lg font-bold text-white">
+                    R$ {dynamicRisk.lgpdFine.maxLegalFine.toLocaleString('pt-BR')},00
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">Cap regulatório da ANPD</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-950 border border-rose-500/30 space-y-1">
+                  <span className="text-rose-400 block text-[11px] uppercase font-bold">Risco Anterior à Consultoria</span>
+                  <span className="text-lg font-bold text-rose-400">
+                    R$ {dynamicRisk.lgpdFine.estimatedFineBefore.toLocaleString('pt-BR')},00
+                  </span>
+                  <span className="text-[10px] text-rose-400/80 block">Baseado nas falhas críticas do baseline</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-1">
+                  <span className="text-emerald-400 block text-[11px] uppercase font-bold">Passivo Jurídico Evitado (ROI)</span>
+                  <span className="text-lg font-bold text-emerald-400">
+                    R$ {dynamicRisk.lgpdFine.riskAvoided.toLocaleString('pt-BR')},00
+                  </span>
+                  <span className="text-[10px] text-emerald-400/80 block">Economia gerada pela mitigação</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* RELATÓRIO QUANTITATIVO FAIR (Factor Analysis of Information Risk) */}
+          {dynamicRisk && (
+            <div className="p-6 sm:p-8 rounded-2xl bg-surface border border-surface-border space-y-5 print-avoid-break">
+              <div className="flex items-center justify-between pb-3 border-b border-surface-border">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-base font-bold text-white">
+                    Relatório Financeiro FAIR para C-Level (Quantificação de Riscos)
+                  </h3>
+                </div>
+                <span className="text-xs font-mono text-slate-400">Padrão Internacional Open FAIR</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 font-mono text-xs">
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                  <span className="text-slate-500 block text-[10px] uppercase">Frequência de Ameaça (TEF)</span>
+                  <span className="text-sm font-bold text-amber-300 block">
+                    {dynamicRisk.fairRisk.threatEventFrequency}
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                  <span className="text-slate-500 block text-[10px] uppercase">Vulnerabilidade Residual</span>
+                  <span className="text-sm font-bold text-cyan-300 block">
+                    {dynamicRisk.fairRisk.vulnerabilityFactor}% de probabilidade
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                  <span className="text-slate-500 block text-[10px] uppercase">Perda Anualizada (ALE Pós-Correção)</span>
+                  <span className="text-sm font-bold text-emerald-400 block">
+                    R$ {dynamicRisk.fairRisk.annualizedLossExpectancy.toLocaleString('pt-BR')},00
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-1">
+                  <span className="text-emerald-400 block text-[10px] uppercase font-bold">Economia Financeira Total</span>
+                  <span className="text-base font-extrabold text-emerald-400 block">
+                    R$ {dynamicRisk.fairRisk.mitigatedLossSavings.toLocaleString('pt-BR')},00
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-emerald-500/30 text-xs text-slate-300 leading-relaxed font-sans space-y-1">
+                <span className="font-mono text-emerald-400 font-bold block uppercase text-[11px]">
+                  Conclusão Executiva para o Conselho de Administração:
+                </span>
+                <p>
+                  A implementação das remediações recomendadas pela consultoria da Dev & Sec resultou em uma redução estimada de{' '}
+                  <strong className="text-white">
+                    R$ {dynamicRisk.fairRisk.mitigatedLossSavings.toLocaleString('pt-BR')},00
+                  </strong>{' '}
+                  em perdas decorrentes de potenciais incidentes cibernéticos (indisponibilidade, extorsão ransomware e resposta a incidentes)
+                  e evitou uma exposição regulatória sob a LGPD avaliada em até{' '}
+                  <strong className="text-white">
+                    R$ {dynamicRisk.lgpdFine.riskAvoided.toLocaleString('pt-BR')},00
+                  </strong>.
+                </p>
+              </div>
+
+              <div className="flex justify-end pt-2 no-print">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold font-mono text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimir / Exportar PDF Executivo FAIR
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
